@@ -1,0 +1,2 @@
+packages/bundle/dsh-theme-firefly/lib/client.js filter=lfs diff=lfs merge=lfs -text
+packages/bundle/dsh-theme-firefly/assets/dspk.png filter=lfs diff=lfs merge=lfs -text
