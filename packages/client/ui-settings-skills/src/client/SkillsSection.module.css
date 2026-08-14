@@ -1,0 +1,205 @@
+/* Skills settings section, in the settings-panel design language shared with
+   the Models page: 14/22 body, 12/18 caption, capsule controls, and `border-l2`
+   hairlines. Every color resolves through a `--dsw-alias-*` token. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--dsw-alias-border-l3);
+  border-radius: 8px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: center;
+}
+
+.rows {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rowCard {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowName {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code);
+}
+
+.rowTag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.rowDescription {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.rowPath {
+  margin: 0;
+  font-family: var(--ds-font-family-code);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.toggleButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.toggleButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.toggleButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toggleTrack {
+  width: 24px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  position: relative;
+  transition: background-color 120ms ease;
+  flex: none;
+}
+
+.toggleTrack::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--dsw-alias-label-secondary);
+  transition: transform 120ms ease;
+}
+
+.toggleTrack[data-on] {
+  background: var(--dsw-alias-state-success-primary);
+}
+
+.toggleTrack[data-on]::after {
+  transform: translateX(10px);
+  background: #fff;
+}
+
+.toggleLabel {
+  white-space: nowrap;
+}
+
+.dangerButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--dsw-alias-state-error-primary);
+  font: inherit;
+  font-size: 12px;
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.dangerButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.deleteConfirm:not(:disabled) {
+  border-color: var(--dsw-alias-state-error-primary);
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.deleteConfirm:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}

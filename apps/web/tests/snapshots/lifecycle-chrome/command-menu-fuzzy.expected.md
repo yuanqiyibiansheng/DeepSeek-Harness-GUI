@@ -1,0 +1,3 @@
+- listbox "Trigger suggestions":
+  - text: Commands
+  - option "compact 压缩较旧的对话历史" [selected]

@@ -1,0 +1,17 @@
+{
+  "name": "@deepseek-ai/dsh-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tauri desktop shell for the DeepSeek Harness Web UI",
+  "license": "MIT",
+  "scripts": {
+    "tauri": "tauri",
+    "prepare:bundle": "node scripts/prepare-bundle.mjs",
+    "build": "node scripts/prepare-bundle.mjs && tauri build",
+    "build:no-bundle": "node scripts/prepare-bundle.mjs && tauri build --no-bundle"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.10.1"
+  }
+}

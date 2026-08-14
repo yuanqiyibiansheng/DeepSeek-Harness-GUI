@@ -1,0 +1,75 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body, #root { width: 100%; height: 100%; overflow: hidden; user-select: none; font-family: "Segoe UI", system-ui, sans-serif; }
+
+.stage { width: 100%; height: 100%; display: flex; flex-direction: column; background: #0f172a center / cover no-repeat; position: relative; color: #f8fafc; }
+.stage-1 { background-image: url("/bg/1.jpg"); }
+.stage-2 { background-image: url("/bg/2.jpg"); }
+.stage-3 { background-image: url("/bg/3.jpg"); }
+.stage::before { content: ""; position: absolute; inset: 0; background: rgba(2, 6, 23, 0.52); }
+
+.titlebar { height: 40px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 10px 0 14px; position: relative; z-index: 2; }
+.titlebar-title { font-size: 12px; color: rgba(248, 250, 252, 0.85); letter-spacing: 0; }
+.titlebar-controls { display: flex; gap: 6px; }
+.titlebar-btn { width: 28px; height: 28px; border: none; border-radius: 6px; background: rgba(255, 255, 255, 0.12); color: #f8fafc; cursor: pointer; display: grid; place-items: center; }
+.titlebar-btn:hover { background: rgba(255, 255, 255, 0.22); }
+.titlebar-btn-close:hover { background: rgba(239, 68, 68, 0.9); }
+
+.steps { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 0 4px; position: relative; z-index: 2; }
+.step { display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: 0.65; }
+.step.active { opacity: 1; }
+.step.done { opacity: 0.9; }
+.step-dot { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.3); color: #f8fafc; }
+.step.active .step-dot { background: #2563eb; border-color: #2563eb; }
+.step.done .step-dot { background: #16a34a; border-color: #16a34a; }
+.step-label { font-size: 11px; color: #e2e8f0; }
+
+.installer { flex: 1; display: flex; flex-direction: column; position: relative; z-index: 2; min-height: 0; }
+.installer-content { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 26px 10px; display: flex; flex-direction: column; }
+.installer-footer { display: flex; justify-content: flex-end; gap: 12px; padding: 12px 26px 18px; }
+
+.page { display: flex; flex-direction: column; flex: 1; }
+.welcome { align-items: center; justify-content: center; text-align: center; }
+.panel { background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px; padding: 18px; backdrop-filter: blur(8px); }
+.page-title { font-size: 21px; font-weight: 700; color: #ffffff; margin-bottom: 8px; letter-spacing: 0; }
+.page-subtitle { font-size: 13px; color: rgba(226, 232, 240, 0.9); margin-bottom: 16px; line-height: 1.6; }
+.welcome-badge { width: 74px; height: 74px; border-radius: 18px; background: #2563eb; color: #fff; display: grid; place-items: center; font-size: 26px; font-weight: 800; margin: 8px auto 0; box-shadow: 0 14px 30px rgba(37, 99, 235, 0.45); }
+
+.license-scroll { flex: 1; min-height: 180px; overflow-y: auto; background: rgba(15, 23, 42, 0.55); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.7; color: #e2e8f0; white-space: pre-line; }
+.license-scroll::-webkit-scrollbar { width: 6px; }
+.license-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.5); border-radius: 3px; }
+
+.dir-row { display: flex; gap: 8px; align-items: center; }
+.dir-row input { flex: 1; height: 38px; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 8px; background: rgba(255, 255, 255, 0.12); color: #fff; padding: 0 10px; font-size: 13px; outline: none; }
+.btn-ghost { background: rgba(255, 255, 255, 0.14); color: #fff; border: 1px solid rgba(255, 255, 255, 0.24); padding: 0 14px; height: 38px; border-radius: 8px; font-size: 13px; cursor: pointer; }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.24); }
+.space-row { display: flex; gap: 36px; margin-top: 14px; }
+.space-label { font-size: 11px; color: rgba(148, 163, 184, 0.9); margin-bottom: 4px; }
+.space-ok { font-size: 16px; font-weight: 700; color: #4ade80; }
+.space-bad { font-size: 16px; font-weight: 700; color: #f87171; }
+.space-value { font-size: 16px; font-weight: 700; color: #e2e8f0; }
+.error-text { margin-top: 12px; font-size: 13px; color: #f87171; }
+
+.install-page { align-items: center; justify-content: center; text-align: center; gap: 12px; }
+.progress-bar { width: 100%; max-width: 340px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+.progress-fill { height: 100%; background: linear-gradient(90deg, #2563eb, #60a5fa); border-radius: 4px; transition: width 0.35s ease; }
+.progress-text { font-size: 22px; font-weight: 800; color: #fff; }
+.status-text { font-size: 13px; color: rgba(226, 232, 240, 0.9); }
+
+.finish-page { align-items: center; justify-content: center; text-align: center; gap: 12px; }
+.success-mark { width: 64px; height: 64px; border-radius: 50%; background: rgba(34, 197, 94, 0.22); border: 1px solid rgba(34, 197, 94, 0.5); color: #4ade80; display: grid; place-items: center; font-size: 30px; font-weight: 800; }
+.finish-btn { margin-top: 8px; padding: 10px 44px; font-size: 15px; }
+
+.btn-primary { background: #2563eb; color: #fff; border: none; padding: 10px 24px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background 0.15s; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: rgba(255, 255, 255, 0.12); color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.24); padding: 10px 24px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.btn-secondary:hover { background: rgba(255, 255, 255, 0.22); }
+.btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #e2e8f0; cursor: pointer; }
+.checkbox-label input { display: none; }
+.checkbox-mark { width: 18px; height: 18px; border: 2px solid rgba(255, 255, 255, 0.45); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.checkbox-label input:checked + .checkbox-mark { background: #2563eb; border-color: #2563eb; }
+.checkbox-mark::after { content: ""; width: 5px; height: 9px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translateY(-1px); opacity: 0; }
+.checkbox-label input:checked + .checkbox-mark::after { opacity: 1; }

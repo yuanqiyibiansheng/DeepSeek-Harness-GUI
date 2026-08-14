@@ -1,0 +1,9 @@
+- listbox "Trigger suggestions":
+  - text: Commands
+  - option "compact 压缩较旧的对话历史" [selected]
+  - option "export 导出本次会话日志为ZIP压缩包"
+  - option "feedback 记录本次会话的反馈"
+  - option "goal 设置或查看长期任务的目标"
+  - option "permission 切换权限预设（沙箱模式 + 审批策略）"
+  - option "plan 进入或退出规划模式"
+  - option "model 选择本会话使用的模型"
