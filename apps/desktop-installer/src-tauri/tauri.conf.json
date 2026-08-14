@@ -1,0 +1,35 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "productName": "DeepSeek Harness Setup",
+  "version": "0.1.0",
+  "identifier": "ai.deepseek.harness.installer",
+  "build": {
+    "frontendDist": "../dist",
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "DeepSeek Harness Setup",
+        "width": 600,
+        "height": 500,
+        "minWidth": 600,
+        "minHeight": 500,
+        "maxWidth": 600,
+        "maxHeight": 500,
+        "resizable": false,
+        "center": true,
+        "decorations": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.ico"]
+  }
+}

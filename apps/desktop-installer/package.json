@@ -1,0 +1,29 @@
+{
+  "name": "@deepseek-ai/dsh-desktop-installer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "tauri": "tauri",
+    "build:setup": "node scripts/prepare-payload.mjs && tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.11.1",
+    "@tauri-apps/plugin-dialog": "^2.2.1",
+    "framer-motion": "^11.18.2",
+    "i18next": "^26.0.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-i18next": "^17.0.4",
+    "react-icons": "^5.7.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.8.2",
+    "vite": "^6.0.11"
+  }
+}

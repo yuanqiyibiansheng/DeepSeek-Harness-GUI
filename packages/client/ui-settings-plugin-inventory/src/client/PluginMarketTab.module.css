@@ -1,0 +1,194 @@
+/* Plugin Market tab: searchable cards over the plugin-market wire. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.search {
+  flex: 1 1 260px;
+  max-width: 360px;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+}
+
+.search:focus {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.search::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+}
+
+.status {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.failure {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.cards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card {
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.info {
+  flex: 1;
+  min-width: 0;
+}
+
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.title {
+  font-size: 14px;
+  line-height: 22px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.officialTag {
+  flex: none;
+  padding: 1px 6px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.author {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.description {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.source {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--ds-font-family-code);
+  font-size: 12px;
+  color: var(--dsw-alias-label-tertiary);
+  overflow-wrap: anywhere;
+}
+
+.statusRow {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.installed {
+  color: var(--dsw-alias-state-success-primary);
+}
+
+.notInstalled {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: none;
+}
+
+.primaryButton,
+.secondaryButton,
+.dangerButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: none;
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+.secondaryButton {
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.dangerButton {
+  border: 1px solid var(--dsw-alias-state-error-primary);
+  background: transparent;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.dangerButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

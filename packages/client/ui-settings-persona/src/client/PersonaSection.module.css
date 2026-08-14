@@ -1,0 +1,128 @@
+/* Persona settings section, in the settings-panel design language shared with
+   the Models and Skills pages. Every color resolves through a `--dsw-alias-*`
+   token. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.intro {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.empty {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 220px;
+  padding: 12px 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-primary);
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.textarea::placeholder {
+  color: var(--dsw-alias-label-dimmed);
+}
+
+.textarea:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.primaryButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 18px;
+  background: var(--dsw-alias-button-primary-fill);
+  color: var(--dsw-alias-label-primary-foreground);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--dsw-alias-button-primary-hover);
+}
+
+.primaryButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.secondaryButton {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 18px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  cursor: pointer;
+}
+
+.secondaryButton:hover:not(:disabled) {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-error-primary);
+}
+
+.saved {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-state-success-primary);
+}
