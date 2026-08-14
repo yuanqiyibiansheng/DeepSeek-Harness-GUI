@@ -21,7 +21,6 @@ export const zh = {
   failed: '挂载失败',
   unloading: '卸载中',
   marketSearch: '搜索插件市场',
-  marketNav: '插件市场',
   marketUpdateAll: '更新全部',
   marketError: '插件操作失败',
   marketEmpty: '没有匹配的插件。',
@@ -32,7 +31,6 @@ export const zh = {
   marketInstalling: '安装中…',
   marketUninstall: '卸载',
   marketRemoving: '卸载中…',
-  close: '关闭',
 } satisfies Record<string, string>
 
 /** Plugin inventory locale key union. */
@@ -59,7 +57,6 @@ export const en = {
   failed: 'Mount failed',
   unloading: 'Unloading',
   marketSearch: 'Search plugin market',
-  marketNav: 'Plugin market',
   marketUpdateAll: 'Update all',
   marketError: 'Plugin operation failed',
   marketEmpty: 'No matching plugins.',
@@ -70,5 +67,4 @@ export const en = {
   marketInstalling: 'Installing…',
   marketUninstall: 'Uninstall',
   marketRemoving: 'Removing…',
-  close: 'Close',
 } satisfies Record<PluginInventoryLocaleKey, string>
