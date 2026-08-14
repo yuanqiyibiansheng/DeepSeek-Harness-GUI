@@ -25,7 +25,7 @@
 - 历史记录写入项目目录 `.recode/history.db`，完全本地，不需要服务器
 
 ### 插件市场
-- 左下角侧边栏底部提供「插件市场」入口
+- 设置页「插件」分区提供「插件市场」标签页
 - ComfyUI Manager 风格：搜索、安装、卸载、更新全部
 - 底层通过 `dsh plugin` 管理 web profile 插件
 
@@ -53,6 +53,7 @@
 ### 其他修复
 - 侧边栏按钮 Tooltip 气泡改为挂载到 `document.body` 并使用顶层 z-index，不再被侧边栏或面板遮挡
 - 移除透明面板问题，详情面板保持不透明显示
+- 移除主页侧边栏底部的重复「插件市场」入口，插件市场仅保留在设置页
 
 ## 项目结构
 
@@ -66,7 +67,7 @@ apps/desktop-installer/          自定义安装器源码（Vite + Tauri）
 packages/client/ui-sidebar-toggle/   代码审阅入口、回滚按钮、弹窗
 packages/client/ui-settings-persona/ 人格设定页面
 packages/client/ui-settings-skills/  技能管理页面
-packages/client/ui-settings-plugin-inventory/  插件市场页面与左下角入口
+packages/client/ui-settings-plugin-inventory/  插件市场页面（设置页入口）
 packages/client/ui-settings-models/  模型设置与供应商预设
 packages/client/connection/     客户端通信与 wire 接口
 packages/host/apiproxy/         宿主 API 网关、skills/pluginMarket/host 接口
@@ -131,3 +132,12 @@ pnpm --filter @deepseek-ai/dsh-desktop-installer run build:setup
 - `sessions`：会话数据
 - `storages`：存储数据
 - `settings.yaml`：用户设置
+
+## 更新日志
+
+### 2026-08-15
+- 修改目标：移除主页侧边栏底部重复的插件市场入口。
+- 修改文件：`packages/client/ui-settings-plugin-inventory/src/client/index.ts`、`PluginMarketAction.tsx`、`PluginMarketAction.module.css`、`locales.ts`、`tests/browser-plugin.client.spec.tsx`、`README.md`。
+- 修改内容：不再注册 `sidebar.footer.action` 插件市场按钮，删除该按钮组件与专用文案；设置页插件市场标签保持不变。
+- 影响范围：桌面客户端主页左下角不再显示插件市场按钮；设置页插件市场功能不受影响。
+- 注意事项：本次未改动插件市场 API 与安装卸载逻辑；重新构建桌面主程序与安装器后生效。

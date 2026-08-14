@@ -3,17 +3,13 @@
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
-// Type-only: pulls ui-sidebar's SlotMap merge (the 'sidebar.footer.action' entry).
-import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { PluginInventorySettingsTab, type PluginInventorySettingsTabInjected } from './PluginInventorySettingsTab.tsx'
 import { PluginMarketTab, type PluginMarketTabInjected } from './PluginMarketTab.tsx'
-import { PluginMarketAction } from './PluginMarketAction.tsx'
 import { en, zh, type PluginInventoryLocaleKey } from './locales.ts'
 
 export type { PluginInventorySettingsTabInjected, PluginInventorySettingsTabProps } from './PluginInventorySettingsTab.tsx'
 export type { PluginMarketTabInjected, PluginMarketTabProps } from './PluginMarketTab.tsx'
-export type { PluginMarketActionProps } from './PluginMarketAction.tsx'
 export type { PluginInventoryLocaleKey } from './locales.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -65,13 +61,4 @@ export function apply(ctx: ClientContext): void {
     inject: marketInjected,
   }, PluginMarketTab))
 
-  // A sidebar footer action opens the plugin market overlay from the main
-  // shell (ComfyUI-Manager-style access), reusing the same market tab content.
-  ctx.slots.inject('sidebar.footer.action', () => ctx.slots.register({
-    name: 'sidebar.footer.action',
-    id: 'plugin-market',
-    order: 0,
-    locale: NS,
-    inject: marketInjected,
-  }, PluginMarketAction))
 }
