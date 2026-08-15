@@ -227,7 +227,10 @@ fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {  let root = 
   })?;
   let node = root.join("node").join("node.exe");
   let dsh = root.join("dsh");
-  let entry = dsh.join("lib").join("bin.js");
+  let mut entry = dsh.join("lib").join("bin.js");
+  if !entry.exists() {
+    entry = dsh.join("node_modules").join("@deepseek-ai").join("dsh").join("lib").join("bin.js");
+  }
   if !node.exists() || !entry.exists() {
     return Err(format!(
       "desktop bundle incomplete (node: {}, entry: {})",

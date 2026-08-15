@@ -237,6 +237,26 @@
     - id: terminal-host
       name: '@deepseek-ai/dsh-terminal-host'
 
+    # Project memory: keeps the Memorix MCP row in the harness user patch layer.
+    - id: project-memory
+      name: '@deepseek-ai/dsh-project-memory'
+
+    # Desktop pet: the global floating companion (working/thinking/idle states).
+    - id: ui-pet
+      name: '@deepseek-ai/dsh-client-ui-pet'
+
+    # Project memory: the Memorix integration switch (Settings -> General).
+    - id: ui-project-memory
+      name: '@deepseek-ai/dsh-client-ui-project-memory'
+
+    # Plugin marketplace: the Settings → Plugins "Marketplace" tab (npm search/install).
+    - id: ui-plugin-marketplace
+      name: '@deepseek-ai/dsh-client-ui-plugin-marketplace'
+
+    # Vision enhancement: settings row + composer shortcut for the Bailian image bridge.
+    - id: ui-vision-enhancement
+      name: '@deepseek-ai/dsh-client-ui-vision-enhancement'
+
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).
     - id: ui-input-trigger
@@ -440,5 +460,3 @@
       name: '@deepseek-ai/dsh-agent-presets'
       config:
         default: standard
-
-

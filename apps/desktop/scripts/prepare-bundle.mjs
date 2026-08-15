@@ -34,7 +34,20 @@ execFileSync(
 
 const entry = join(dshDir, 'lib', 'bin.js')
 if (!existsSync(entry)) {
-  throw new Error(`dsh bundle entry missing: ${entry}`)
+  const nestedPackage = join(dshDir, 'node_modules', '@deepseek-ai', 'dsh')
+  const nestedEntry = join(nestedPackage, 'lib', 'bin.js')
+  if (!existsSync(nestedEntry)) {
+    throw new Error(`dsh bundle entry missing: ${entry}`)
+  }
+  cpSync(nestedPackage, dshDir, {
+    recursive: true,
+    force: true,
+    dereference: false,
+    filter: sourcePath => {
+      const parts = sourcePath.split(/[\\/]/)
+      return !parts.includes('node_modules') && !sourcePath.endsWith('.map')
+    },
+  })
 }
 
 copyWorkspacePackages()
@@ -45,7 +58,21 @@ removeJunk()
 cleanRuntimeFiles()
 
 mkdirSync(nodeDir, { recursive: true })
-cpSync(process.execPath, nodeExe, { force: true, dereference: true })
+if (existsSync(nodeExe)) {
+  try {
+    const existing = realpathSync(nodeExe).toLowerCase()
+    const current = realpathSync(process.execPath).toLowerCase()
+    if (existing === current) {
+      console.log('bundled node is already the current runtime; keeping it')
+    } else {
+      cpSync(process.execPath, nodeExe, { force: true, dereference: true })
+    }
+  } catch {
+    cpSync(process.execPath, nodeExe, { force: true, dereference: true })
+  }
+} else {
+  cpSync(process.execPath, nodeExe, { force: true, dereference: true })
+}
 bundleNpm()
 bundleMemorix()
 console.log(`desktop bundle ready: ${bundleDir}`)

@@ -77,6 +77,10 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
     "@deepseek-ai/dsh-client-ui-sidebar-toggle": "workspace:^",
     "@deepseek-ai/dsh-client-ui-terminal": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-pet": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-plugin-marketplace": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-project-memory": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-vision-enhancement": "workspace:^",
     "@deepseek-ai/dsh-terminal-host": "workspace:^",
     "@deepseek-ai/dsh-client-ui-skill": "workspace:^",
     "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
@@ -100,6 +104,7 @@
     "@deepseek-ai/dsh-host-plugin-inventory": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-message-feedback": "workspace:^",
+    "@deepseek-ai/dsh-project-memory": "workspace:^",
     "@deepseek-ai/dsh-session-projection-cache": "workspace:^",
     "@deepseek-ai/dsh-session-log-export": "workspace:^",
     "@deepseek-ai/dsh-session-stats": "workspace:^",
@@ -125,4 +130,3 @@
     "@deepseek-ai/cordis": "workspace:^"
   }
 }
-
