@@ -47,7 +47,30 @@ cleanRuntimeFiles()
 mkdirSync(nodeDir, { recursive: true })
 cpSync(process.execPath, nodeExe, { force: true, dereference: true })
 bundleNpm()
+bundleMemorix()
 console.log(`desktop bundle ready: ${bundleDir}`)
+
+/**
+ * Bundle the built Memorix runtime beside the bundled node so the
+ * project-memory switch can start `memorix serve` without a system install.
+ * The runtime directory is produced locally by the desktop build workflow
+ * (and ignored by git); prepare-bundle fails loud when it is incomplete.
+ */
+function bundleMemorix() {
+  const source = join(desktopDir, 'memorix-runtime')
+  const dest = join(bundleDir, 'memorix')
+  if (!existsSync(source)) {
+    console.log('memorix runtime absent; skipping project-memory bundle')
+    return
+  }
+  if (existsSync(dest)) {
+    rmSync(dest, { recursive: true, force: true })
+  }
+  cpSync(source, dest, { recursive: true, force: true, dereference: false })
+  if (!existsSync(join(dest, 'dist', 'cli', 'index.js'))) {
+    throw new Error('memorix bundle incomplete: dist/cli/index.js missing')
+  }
+}
 
 /**
  * Bundle the npm CLI beside the bundled node so the plugin marketplace can

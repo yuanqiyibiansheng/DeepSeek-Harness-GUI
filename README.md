@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Project memory (Memorix) integration
+
+- Goal: give the desktop client a project-memory switch in General settings (enabled by default) and bundle Memorix as the local memory layer, so a new conversation can read project history, progress, and decisions instead of starting blank.
+- Files: packages/client/ui-project-memory (new settings-toggle plugin), packages/host/project-memory (new host plugin managing the Memorix MCP row), packages/bundle/web-app (dependencies and loader rows), packages/host/apiproxy/src/api-proxy.ts (settings whitelist), apps/desktop/scripts/prepare-bundle.mjs and apps/desktop-installer/scripts/prepare-payload.mjs (bundle the Memorix runtime), tsconfig.client.json, tsconfig.host.json, README.md, README.zh.md.
+- Changes: when the switch is on, the host writes the `memory-memorix` row for `@deepseek-ai/dsh-mcp-client` into `$DSH_HOME/cordis.patch.yml` with the bundled node and Memorix CLI; when it is off, the row is removed. Memorix serves over stdio and its tools appear as `mcp__memorix__*`. The change takes effect after restarting the client.
+- Impact: General settings shows a Project memory toggle; the installer now ships the Memorix 1.5.0 runtime (the payload grows to about 233 MB).
+- Notes: Memorix binds the project through MCP workspace roots or `memorix_session_start`; the `apps/desktop/memorix-runtime` directory is git-ignored and is produced by the desktop build workflow before packaging.
+
 ### Restore Agent preset descriptions in settings
 
 - Goal: the Agent preset management page stopped showing each preset's description and id because the dialog edit removed the card body render; the CSS and tests for the description were still present.

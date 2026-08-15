@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### 项目记忆（Memorix）集成
+
+- 修改目标：在客户端 设置 → 通用 中新增“项目记忆”开关（默认启用），并内置 Memorix 作为本地项目记忆层，让新对话可以读取项目历史、进度与决策，而不是从空白开始。
+- 修改文件：packages/client/ui-project-memory（新增设置开关插件）、packages/host/project-memory（新增管理 Memorix MCP 行的 host 插件）、packages/bundle/web-app（依赖与加载行）、packages/host/apiproxy/src/api-proxy.ts（设置白名单）、apps/desktop/scripts/prepare-bundle.mjs 与 apps/desktop-installer/scripts/prepare-payload.mjs（打包 Memorix 运行时）、tsconfig.client.json、tsconfig.host.json、README.md、README.zh.md。
+- 修改内容：开关启用时，host 会自动向 `$DSH_HOME/cordis.patch.yml` 写入 `memory-memorix` 的 `@deepseek-ai/dsh-mcp-client` 行，使用内置 node 与 Memorix CLI 启动；关闭时移除该行。Memorix 通过 stdio 提供 MCP 工具，工具名称为 `mcp__memorix__*`；切换开关后需重启客户端生效。
+- 影响范围：设置 通用 出现“项目记忆”开关；安装器内置 Memorix 1.5.0 运行时（payload 增至约 233 MB）。
+- 注意事项：Memorix 通过 MCP workspace roots 或 `memorix_session_start` 绑定项目；`apps/desktop/memorix-runtime` 目录不入 git，由桌面构建流程在打包前生成。
+
 ### 恢复 Agent 预设设置页的描述
 
 - 修改目标：Agent 预设管理页不再显示每个预设的描述和标识，因为对话框编辑时移除了卡片主体渲染；对应的 CSS 与测试仍然存在。
