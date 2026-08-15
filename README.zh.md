@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### 撤销 OpenCode Agent 引擎接入
+
+- 修改目标：移除实验性的 Harness/OpenCode 引擎切换与内置 OpenCode Web 运行时，桌面客户端继续使用客户端内部的 DeepSeek Harness 对话界面。
+- 修改文件：packages/client/ui-agent-engine（已删除）、apps/desktop/src-tauri/src/lib.rs、apps/desktop/src-tauri/build.rs、apps/desktop/src-tauri/capabilities/default.json、apps/desktop/scripts/prepare-bundle.mjs、apps/desktop-installer/scripts/prepare-payload.mjs、packages/bundle/web-app、tsconfig.client.json、pnpm-lock.yaml、README.md、README.zh.md。
+- 修改内容：移除 Agent 引擎设置行、OpenCode 子进程生命周期、对应命令权限、OpenCode 运行时打包与安装器 payload。保留构建稳健性修复：当 pnpm 把 CLI 包部署到 node_modules 时，桌面包仍会补齐可用的 dsh 入口；若 bundled node 已是最新运行时可跳过自复制。
+- 影响范围：安装器 payload 回到约 233 MB，不再包含 OpenCode；桌面客户端正常启动 DeepSeek Harness Web UI。
+- 注意事项：桌面端 exe 与自定义安装器已从源码重新构建；冒烟测试已在本地端口启动打包后的 web 后端并返回 HTTP 200。
+
 ### 项目记忆（Memorix）集成
 
 - 修改目标：在客户端 设置 → 通用 中新增“项目记忆”开关（默认启用），并内置 Memorix 作为本地项目记忆层，让新对话可以读取项目历史、进度与决策，而不是从空白开始。

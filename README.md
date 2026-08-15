@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Revert OpenCode agent engine integration
+
+- Goal: remove the experimental Harness/OpenCode engine switch and the bundled OpenCode web runtime; the desktop client stays on the in-app DeepSeek Harness conversation UI.
+- Files: packages/client/ui-agent-engine (removed), apps/desktop/src-tauri/src/lib.rs, apps/desktop/src-tauri/build.rs, apps/desktop/src-tauri/capabilities/default.json, apps/desktop/scripts/prepare-bundle.mjs, apps/desktop-installer/scripts/prepare-payload.mjs, packages/bundle/web-app, tsconfig.client.json, pnpm-lock.yaml, README.md, README.zh.md.
+- Changes: removed the Agent engine settings row, the OpenCode child-process lifecycle, its command permissions, the OpenCode runtime bundling, and the OpenCode installer payload. Build robustness fixes remain: the desktop bundle keeps a usable dsh entry when pnpm deploys the CLI package under node_modules, and bundled-node copy is skipped when it is already the current runtime.
+- Impact: the installer returns to about 233 MB payload without OpenCode; the desktop client starts with the normal DeepSeek Harness web UI.
+- Notes: the desktop exe and custom installer were rebuilt from source, and a smoke test started the bundled web backend on a local port and returned HTTP 200.
+
 ### Project memory (Memorix) integration
 
 - Goal: give the desktop client a project-memory switch in General settings (enabled by default) and bundle Memorix as the local memory layer, so a new conversation can read project history, progress, and decisions instead of starting blank.
