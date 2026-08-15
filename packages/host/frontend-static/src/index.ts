@@ -68,7 +68,9 @@ export async function serveStatic(
   }
   const serveIndex = async (): Promise<void> => {
     const body = await renderIndex()
-    res.writeHead(200, { 'content-type': MIME['.html'] })
+    // The index body carries the dynamically injected boot manifest, so it
+    // must never be served from a WebView cache after a client-bundle rebuild.
+    res.writeHead(200, { 'content-type': MIME['.html'], 'cache-control': 'no-store' })
     res.end(body)
   }
   if (target === distRoot || target === distIndex) {
