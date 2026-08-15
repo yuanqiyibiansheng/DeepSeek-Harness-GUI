@@ -114,9 +114,9 @@ pnpm --filter @deepseek-ai/dsh-desktop-installer run build:setup
 - 插件市场、人格设定、技能管理、供应商一键导入参考：SnowSalt  
   https://github.com/KYZHXL/deepseek-harness-snowsalt
 
-- 右侧面板、鲸鱼娘宠物、图像理解参考：dsh-web-ui  
+- 右侧面板与图像理解参考：dsh-web-ui  
   https://github.com/zhu1090093659/dsh-web-ui  
-  说明：本仓库参考过 dsh-web-ui 的方案；最终发布版未内置右侧面板，宠物与图像理解可作为外部插件单独安装。
+  说明：本仓库参考过 dsh-web-ui 的方案；最终发布版未内置右侧面板，鲸鱼娘宠物功能已移除，图像理解可作为外部插件单独安装。
 
 本项目为二创项目，保留上游 LICENSE 与 THIRD_PARTY_NOTICES 中的署名要求。涉及 GPL-3.0 / Apache-2.0 / MIT 的部分均按各自许可证保留来源说明。
 
