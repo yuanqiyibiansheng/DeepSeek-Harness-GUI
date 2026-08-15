@@ -1,0 +1,56 @@
+/** The terminal shell preference row styles. */
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+}
+
+.rowText {
+  min-width: 0;
+}
+
+.title {
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.desc {
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 160px;
+  padding: 5px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.select:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+}
+
+/* The chevron rotates while the menu is open (NexBox-style affordance). */
+.chevron {
+  transition: transform 0.2s ease;
+}
+
+.selectOpen .chevron {
+  transform: rotate(180deg);
+}

@@ -109,6 +109,7 @@ pub fn install(target_dir: String, create_desktop_shortcut: bool) -> Result<(), 
   let target = PathBuf::from(&target_dir);
   fs::create_dir_all(&target).map_err(|e| e.to_string())?;
   extract_payload(&target)?;
+  seed_user_skills(&target)?;
   register_uninstall(&target_dir)?;
   write_uninstall_script(&target)?;
   fs::write(target.join("uninstall.exe"), UNINSTALL_EXE).map_err(|e| e.to_string())?;
@@ -153,6 +154,47 @@ fn extract_payload(target: &Path) -> Result<(), String> {
       }
       let mut f = fs::File::create(&out).map_err(|e| e.to_string())?;
       std::io::copy(&mut file, &mut f).map_err(|e| e.to_string())?;
+    }
+  }
+  Ok(())
+}
+
+/// The desktop app's DSH_HOME skills root (`%APPDATA%\ai.deepseek.harness.desktop\dsh\skills`).
+fn user_skills_root() -> Result<PathBuf, String> {
+  let data_dir = dirs::data_dir().ok_or_else(|| "no data dir".to_string())?;
+  Ok(data_dir.join("ai.deepseek.harness.desktop").join("dsh").join("skills"))
+}
+
+/// Copy the bundled skills seed into the user skills root. Existing skill
+/// directories are kept untouched: the user may have edited or replaced them.
+fn seed_user_skills(target: &Path) -> Result<(), String> {
+  let seed = target.join("resources").join("skills");
+  if !seed.exists() {
+    return Ok(());
+  }
+  let root = user_skills_root()?;
+  fs::create_dir_all(&root).map_err(|e| e.to_string())?;
+  for entry in fs::read_dir(&seed).map_err(|e| e.to_string())? {
+    let entry = entry.map_err(|e| e.to_string())?;
+    let name = entry.file_name();
+    let dest = root.join(&name);
+    if dest.exists() {
+      continue;
+    }
+    copy_dir_all(&entry.path(), &dest)?;
+  }
+  Ok(())
+}
+
+fn copy_dir_all(from: &Path, to: &Path) -> Result<(), String> {
+  fs::create_dir_all(to).map_err(|e| e.to_string())?;
+  for entry in fs::read_dir(from).map_err(|e| e.to_string())? {
+    let entry = entry.map_err(|e| e.to_string())?;
+    let dest = to.join(entry.file_name());
+    if entry.file_type().map_err(|e| e.to_string())?.is_dir() {
+      copy_dir_all(&entry.path(), &dest)?;
+    } else {
+      fs::copy(&entry.path(), &dest).map_err(|e| e.to_string())?;
     }
   }
   Ok(())

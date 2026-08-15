@@ -78,6 +78,13 @@ export class LocalTerminalHandle implements SubprocessTerminalHandle {
     this.terminal.write(data)
   }
 
+  // node-pty resizes synchronously; the seam returns a promise for remote transports.
+  // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
+  async resize(cols: number, rows: number): Promise<void> {
+    if (this.exited) throw new Error('terminal process has exited')
+    this.terminal.resize(cols, rows)
+  }
+
   // Local inspection is synchronous; the seam returns a promise for remote transports.
   // oxlint-disable-next-line typescript/require-await -- Preserve promise rejection semantics at the async provider contract.
   async inspectForeground(): Promise<SubprocessTerminalForeground | undefined> {

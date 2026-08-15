@@ -76,6 +76,8 @@
     "@dsh-external/dsh-client-ui-skin-maid-atelier": "workspace:^",
     "@deepseek-ai/dsh-client-ui-sidebar": "workspace:^",
     "@deepseek-ai/dsh-client-ui-sidebar-toggle": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-terminal": "workspace:^",
+    "@deepseek-ai/dsh-terminal-host": "workspace:^",
     "@deepseek-ai/dsh-client-ui-skill": "workspace:^",
     "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
     "@deepseek-ai/dsh-client-ui-subagent": "workspace:^",

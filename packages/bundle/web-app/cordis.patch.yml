@@ -229,6 +229,14 @@
     - id: ui-workspace
       name: '@deepseek-ai/dsh-client-ui-workspace'
 
+    # Integrated terminal: the Terminal shell setting row (General settings
+    # section), served by the terminal-host backend routes.
+    - id: ui-terminal
+      name: '@deepseek-ai/dsh-client-ui-terminal'
+
+    - id: terminal-host
+      name: '@deepseek-ai/dsh-terminal-host'
+
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).
     - id: ui-input-trigger

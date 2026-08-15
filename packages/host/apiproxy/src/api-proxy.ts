@@ -8,6 +8,7 @@ import { execFile } from 'node:child_process'
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { homedir } from 'node:os'
+import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
 import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
@@ -124,9 +125,15 @@ const DEFAULT_MAX_MESSAGES = 50
  * registering plugin. Moving that declaration to `settings.register()`, so a
  * plugin can expose its own configuration without a change in this package,
  * is deferred work.
+ *
+ * `describe-image` is the third-party vision-endpoint configuration for the
+ * `@linxin666/dsh-tool-describe-image` bundle (Image understanding). It is
+ * intentionally listed so the Web settings card for the `describe-image`
+ * namespace can be edited from the GUI instead of requiring a manual
+ * composition-layer patch.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek',
+  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek', 'describe-image', 'terminal',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -1099,14 +1106,24 @@ function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceVie
   }
 }
 
-/** The user skill root the web management surface owns (`~/.dsh/skills`). */
+/** The user skill root the web management surface owns (`$DSH_HOME/skills`). */
 function userSkillRoot(): string {
-  return join(homedir(), '.dsh', 'skills')
+  return join(harnessHome(), 'skills')
 }
 
-/** The user-global instructions document (`~/.dsh/AGENTS.md`). */
+/** The user-global instructions document (`$DSH_HOME/AGENTS.md`). */
 function instructionsPath(): string {
-  return join(homedir(), '.dsh', 'AGENTS.md')
+  // $DSH_HOME wins (the desktop app points it at its own data home); the
+  // fallback matches resolveDshHome's default of ~/.dsh. This must agree
+  // with agent-instructions' userGlobal discovery, or the Persona page would
+  // edit a document the loader never injects.
+  return join(harnessHome(), 'AGENTS.md')
+}
+
+/** The harness home ($DSH_HOME, else ~/.dsh) shared by the two helpers above. */
+function harnessHome(): string {
+  const home = process.env.DSH_HOME
+  return home !== undefined && home.trim().length > 0 ? home : join(homedir(), '.dsh')
 }/** The SKILL.md (or flat .md) path for one user-skill entry. */
 function skillFilePath(root: string, name: string): { dir: string; file: string } {
   return { dir: join(root, name), file: join(root, name, 'SKILL.md') }
@@ -1276,15 +1293,6 @@ const PLUGIN_MARKET: readonly PluginMarketEntry[] = [
     bundle: true,
   },
   {
-    id: 'dsh-bash',
-    title: 'Bash Shell',
-    author: 'DeepSeek AI',
-    description: 'Local bash/terminal execution capability with policy controls.',
-    source: '@deepseek-ai/dsh-shell-bash',
-    reference: 'https://github.com/deepseek-ai/deepseek-harness/tree/main/packages/shell/bash',
-    official: true,
-  },
-  {
     id: 'dsh-google-genai',
     title: 'Google GenAI Provider',
     author: 'DeepSeek AI',
@@ -1307,7 +1315,10 @@ const PLUGIN_MARKET: readonly PluginMarketEntry[] = [
 
 /** The web profile directory (`~/.dsh/profiles/web`). */
 function profileDir(): string {
-  return join(homedir(), '.dsh', 'profiles', 'web')
+  // $DSH_HOME wins (the desktop app points it at its own data home); the
+  // fallback matches resolveDshHome's default of ~/.dsh.
+  const home = process.env.DSH_HOME
+  return join(home !== undefined && home.trim().length > 0 ? home : join(homedir(), '.dsh'), 'profiles', 'web')
 }
 
 /** Read the installed bundles and dependencies from the profile manifest. */
@@ -1331,23 +1342,29 @@ async function readInstalledPlugins(): Promise<readonly PluginInstalledEntry[]> 
   return Object.keys(dependencies).map(name => ({ name, bundle: bundleSet.has(name) }))
 }
 
-/** Run one `dsh plugin` command against the web profile. */
+/**
+ * Run one `dsh plugin` command against the web profile. The CLI entry
+ * (@deepseek-ai/dsh's lib/bin.js) is invoked directly through the current
+ * node executable instead of `pnpm dsh`: the desktop deployment's process
+ * cwd is not the harness checkout, so pnpm cannot resolve a `dsh` script or
+ * bin there and fails with ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL. The CLI
+ * itself forwards the remaining arguments to pnpm inside the profile
+ * directory, which stays unchanged.
+ */
 function runPluginCommand(args: readonly string[]): Promise<void> {
-  // pnpm resolves through its .cmd shim on Windows; execFile with the shim
-  // needs shell:true (the same hardening the `dsh plugin` CLI applies). The
-  // command must run inside the harness checkout so `pnpm dsh` finds its bin;
-  // `--profile web` targets the web profile from there.
-  const harnessDir = process.cwd()
+  const cliEntry = join(
+    dirname(fileURLToPath(import.meta.resolve('@deepseek-ai/dsh/package.json'))),
+    'lib', 'bin.js',
+  )
   return new Promise((resolvePromise, rejectPromise) => {
     const child = execFile(
-      'pnpm',
-      ['dsh', 'plugin', '--profile', 'web', ...args],
+      process.execPath,
+      [cliEntry, 'plugin', '--profile', 'web', ...args],
       {
-        cwd: harnessDir,
+        cwd: process.cwd(),
         env: { ...process.env, PATH: `${process.env.PATH ?? ''};${process.env.APPDATA ?? ''}\\npm` },
         maxBuffer: 8 * 1024 * 1024,
         windowsHide: true,
-        shell: process.platform === 'win32',
       },
       (error, stdout, stderr) => {
         const combined = `${stdout ?? ''}${stderr ?? ''}`.trim()
@@ -3608,7 +3625,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return err(request, { code: 'internal', message: `unknown plugin market id "${request.payload.id}"`, details: {} })
         }
         try {
-          await runPluginCommand(['add', entry.source])
+          // `next` is the maintained rc tag: the registry `latest` tag still
+          // points at the pre-bundle 0.0.1-rc.1, which installs as a plain
+          // dependency and never activates as a profile layer.
+          await runPluginCommand(['add', `${entry.source}@next`])
           return ok(request, { installed: true })
         } catch (error: unknown) {
           return err(request, { code: 'internal', message: `plugin install failed: ${String(error)}`, details: {} })

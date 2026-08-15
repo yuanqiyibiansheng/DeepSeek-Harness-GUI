@@ -17,6 +17,17 @@ export const zh = {
   'review.rollbackAction': '回滚',
   'review.rollbackFailed': '回滚失败',
   'review.rollbackNoSnapshot': '尚未建立会话快照',
+  'review.expandAll': '显示全部',
+  'review.collapse': '收起',
+  'review.notGitRepo': '当前目录不是 Git 仓库，无法显示改动',
+  'review.rollbackPreview': '回滚预览',
+  'review.rollbackLoading': '正在读取预览...',
+  'review.rollbackFiles': '将恢复 {count} 个文件',
+  'review.rollbackSkipped': '{count} 个文件无法恢复',
+  'review.rollbackStateModified': '修改',
+  'review.rollbackStateCreated': '新增',
+  'review.rollbackStateDeleted': '删除',
+  'review.rollbackNoDiff': '该文件将恢复到快照版本',
 } satisfies Record<string, string>
 
 /** The code-review namespace key union. */
@@ -39,4 +50,15 @@ export const en = {
   'review.rollbackAction': 'Rollback',
   'review.rollbackFailed': 'Rollback failed',
   'review.rollbackNoSnapshot': 'No snapshot for this conversation yet',
+  'review.expandAll': 'Show all',
+  'review.collapse': 'Collapse',
+  'review.notGitRepo': 'Current directory is not a Git repository; changes cannot be shown',
+  'review.rollbackPreview': 'Rollback preview',
+  'review.rollbackLoading': 'Loading preview...',
+  'review.rollbackFiles': '{count} file(s) will be restored',
+  'review.rollbackSkipped': '{count} file(s) cannot be restored',
+  'review.rollbackStateModified': 'modified',
+  'review.rollbackStateCreated': 'created',
+  'review.rollbackStateDeleted': 'deleted',
+  'review.rollbackNoDiff': 'This file will be restored to the snapshot version',
 } satisfies Record<CodeReviewKey, string>

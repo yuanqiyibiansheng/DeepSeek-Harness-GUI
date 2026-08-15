@@ -3,10 +3,12 @@
  * drawer showing the current workspace git status and diff. Ctrl+Alt+B and
  * the header button both toggle the drawer through a shared DOM event.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconPanelLeftOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import { parseUntrackedFiles, parseWorkspaceDiff, untrackedRows } from './diff-model.ts'
+import { DiffReviewSurface } from './DiffReviewSurface.tsx'
 import css from './CodeReviewAction.module.css'
 
 /** Injected business face: toggle the right-side review drawer. */
@@ -30,6 +32,8 @@ export interface DiffPayload {
   diff?: string
   newFiles?: string
   fingerprint?: string
+  /** True for the session-baseline review served in non-git workspaces. */
+  snapshot?: boolean
   error?: string
 }
 
@@ -84,6 +88,7 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [payload, setPayload] = useState<DiffPayload | null>(null)
+  const [selectedPath, setSelectedPath] = useState<string | null>(null)
   const cwd = useSessions(state => state.byId[sessionId]?.cwd ?? '')
 
   useEffect(() => {
@@ -100,13 +105,13 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
     let controller: AbortController | null = null
     let timer: number | undefined
 
-    const load = (): Promise<DiffPayload | null> => {
+    const load = (retry = 0): Promise<DiffPayload | null> => {
       if (cwd === '') {
         setPayload({ error: t('review.noWorkspace') })
         return Promise.resolve(null)
       }
       controller = new AbortController()
-      return fetch(`http://127.0.0.1:3199/code-review?cwd=${encodeURIComponent(cwd)}`, { signal: controller.signal })
+      return fetch(`http://127.0.0.1:3199/code-review?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}`, { signal: controller.signal })
         .then(response => response.json() as Promise<DiffPayload>)
         .then(json => {
           if (!cancelled) {
@@ -119,7 +124,17 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
           return json
         })
         .catch((error: unknown) => {
-          if (!cancelled) setPayload({ error: String(error) })
+          // The desktop diff server binds a moment after the app window
+          // opens; a fetch in that window fails with "Failed to fetch".
+          // Retry briefly instead of showing the raw error.
+          if (!cancelled && retry < 5) {
+            timer = window.setTimeout(() => { void load(retry + 1) }, 800)
+            return null
+          }
+          if (!cancelled) {
+            setPayload({ error: String(error) })
+            setLoading(false)
+          }
           return null
         })
     }
@@ -152,8 +167,11 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
     setLoading(true)
     load().then(json => {
       if (cancelled) return
-      setLoading(false)
-      if (json?.ok === true) watch()
+      // A null result means a retry is in flight; keep the loading state.
+      if (json !== null) setLoading(false)
+      // The snapshot-based review is computed per request; there is no
+      // git-backed change watcher for it, so skip long-polling.
+      if (json?.ok === true && !json.snapshot) watch()
     })
 
     return () => {
@@ -194,7 +212,31 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
   }, [cwd, sessionId])
 
   const rows = payload?.ok === true ? parseRows(payload.files ?? '', payload.numstat ?? '') : []
+  const parsedFiles = useMemo(
+    () => (payload?.ok === true ? parseWorkspaceDiff(payload.diff ?? '') : []),
+    [payload],
+  )
+  const untrackedFiles = useMemo(
+    () => (payload?.ok === true ? parseUntrackedFiles(payload.newFiles ?? '') : []),
+    [payload],
+  )
+  const activeFile = selectedPath === null ? undefined : parsedFiles.find(file => file.path === selectedPath)
+  const activeUntracked = selectedPath === null ? undefined : untrackedFiles.find(file => file.path === selectedPath)
 
+  // Auto-select the first changed file once a fresh payload lands.
+  useEffect(() => {
+    if (selectedPath === null && rows.length > 0) {
+      setSelectedPath(rows[0]?.path ?? null)
+    }
+  }, [rows, selectedPath])
+
+  // A stale selection (the payload changed between opens) falls back to the
+  // auto-select path instead of leaving the diff area empty.
+  useEffect(() => {
+    if (selectedPath !== null && !rows.some(row => row.path === selectedPath)) {
+      setSelectedPath(null)
+    }
+  }, [rows, selectedPath])
 
   return (
     <>
@@ -222,16 +264,28 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
           </header>
           <div className={css.cwd}>{cwd === '' ? t('review.noWorkspace') : cwd}</div>
           <div className={css.body}>
-            {loading && !payload && <div className={css.status}>{t('review.loading')}</div>}
+            {loading && payload === null && <div className={css.status}>{t('review.loading')}</div>}
             {!loading && payload?.ok !== true && (
-              <div className={css.error}>{payload?.error ?? t('review.failed')}</div>
+              <div className={css.error}>
+                {payload?.error === 'current directory is not inside a git repository'
+                  ? t('review.notGitRepo')
+                  : payload?.error ?? t('review.failed')}
+              </div>
             )}
-            {!loading && payload?.ok === true && (
+            {payload?.ok === true && (
               <>
+                {/* Kept visible while a background refresh is in flight, so
+                    reopening the drawer shows the previous review instantly
+                    instead of waiting for the next full computation. */}
                 <div className={css.files}>
                   {rows.length === 0 && <div className={css.empty}>{t('review.empty')}</div>}
                   {rows.map(row => (
-                    <div className={css.fileRow} key={row.path}>
+                    <button
+                      type="button"
+                      key={row.path}
+                      className={row.path === selectedPath ? `${css.fileRow} ${css.fileRowSelected}` : css.fileRow}
+                      onClick={() => { setSelectedPath(row.path) }}
+                    >
                       <span className={css.filePath}>{row.path}</span>
                       {row.untracked ? (
                         <span className={css.fileUntracked}>{t('review.untracked')}</span>
@@ -241,10 +295,19 @@ export function CodeReviewAction({ sessionId, useSessions, t, togglePanel }: Cod
                           <span className={css.deleted}>-{row.deleted}</span>
                         </span>
                       )}
-                    </div>
+                    </button>
                   ))}
                 </div>
-                <pre className={css.diff}>{payload.stat ?? ''}{payload.diff ?? ''}{payload.newFiles ?? ''}</pre>
+                {activeFile !== undefined || activeUntracked !== undefined ? (
+                  <DiffReviewSurface
+                    path={activeFile?.path ?? activeUntracked?.path ?? ''}
+                    rows={activeFile !== undefined ? activeFile.rows : untrackedRows(activeUntracked?.content ?? '')}
+                    expandLabel={t('review.expandAll')}
+                    collapseLabel={t('review.collapse')}
+                  />
+                ) : (
+                  rows.length > 0 && <div className={css.empty}>{t('review.empty')}</div>
+                )}
               </>
             )}
           </div>

@@ -165,6 +165,14 @@ declare module '@deepseek-ai/cordis' {
      * @mode emit
      */
     'connection/reset'(): void
+    /**
+     * Coarse per-session activity phase for presentation surfaces (the desktop
+     * pet): tool executing (working), step open without a tool (thinking), or
+     * turn ended / idle.
+     * @mode emit
+     * @param event - session id and derived phase.
+     */
+    'session/activity'(event: import('./index.ts').SessionActivityEvent): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -181,6 +189,43 @@ declare module '@deepseek-ai/cordis' {
 
 /** Required services: the wire handle and Client Typert registry. */
 export const inject = ['connection', 'typert', 'remote', 'remote.commands']
+
+/**
+ * Coarse per-session activity phase derived from the mux stream for
+ * presentation surfaces (the desktop pet). Emitted as `session/activity` on
+ * the client Context.
+ */
+export type SessionActivityPhase = 'working' | 'thinking' | 'idle'
+
+/** Payload of the `session/activity` event. */
+export interface SessionActivityEvent {
+  sessionId: SessionId
+  phase: SessionActivityPhase
+}
+
+/**
+ * Derive the activity phase from one session event and emit it.
+ * working = a tool is executing (agent modifying code etc.);
+ * thinking = a step is open but no tool call is pending;
+ * idle = the turn ended or the session idled out.
+ * @param ctx - client context (event emitter).
+ * @param envelope - one mux envelope.
+ */
+function emitSessionActivity(ctx: Context, envelope: { payload: unknown }): void {
+  const frame = envelope.payload as { type?: string; sessionId?: SessionId; event?: { type?: string } }
+  if (frame.type !== 'session/event' || frame.sessionId === undefined || frame.event?.type === undefined) {
+    return
+  }
+  const { sessionId } = frame
+  const type = frame.event.type
+  let phase: SessionActivityPhase | undefined
+  if (type === 'tool/call') phase = 'working'
+  else if (type === 'tool/result' || type === 'turn/end') phase = 'idle'
+  else if (type === 'step/start' || type === 'turn/start' || type === 'assistant/message') phase = 'thinking'
+  if (phase !== undefined) {
+    ctx.emit('session/activity', { sessionId, phase } satisfies SessionActivityEvent)
+  }
+}
 
 /** Mounts the browser runtime services and connection stream.
  * @param ctx - Client Cordis context.
@@ -204,6 +249,7 @@ export function apply(ctx: Context): void {
   const loop = connection.start({
     onMuxEnvelope: (envelope) => {
       sessions.handleMuxEnvelope(envelope)
+      emitSessionActivity(ctx, envelope)
     },
     onHostEnvelope: (envelope) => {
       sessions.handleHostEnvelope(envelope)
