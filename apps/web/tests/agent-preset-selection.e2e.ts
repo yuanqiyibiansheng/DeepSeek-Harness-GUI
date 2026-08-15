@@ -205,7 +205,7 @@ describe('web e2e: agent-preset selection', () => {
     expect(snapshot).toContain('Standard mode')
   })
 
-  it('names every preset and what it is for', async () => {
+  it('names every preset, and keeps the switch list to the name', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-menu'))
     await page.getByRole('button', { name: 'Standard mode' }).click()
     const menu = page.getByRole('menu')
@@ -214,10 +214,13 @@ describe('web e2e: agent-preset selection', () => {
     const snapshot = await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd)
 
     await compareOrRefreshGolden(MENU_EXPECTED, snapshot, MODE)
-    // Every shipped preset, each with the sentence saying what it composes —
-    // the id alone never said what a preset does.
+    // Every shipped preset by name; the description sentences stay out of
+    // the switch list and live in the settings section.
+    expect(snapshot).toContain('Standard mode')
+    expect(snapshot).toContain('Code mode')
     expect(snapshot).toContain('Minimal mode')
     expect(snapshot).toContain('Creator mode')
+    expect(snapshot).not.toContain('Full coding agent')
     await page.keyboard.press('Escape')
   })
 

@@ -71,6 +71,22 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### WebView boot-manifest cache fix for rebuilt client bundles
+
+- Goal: after the Agent preset dialog and client bundles were rebuilt, the client showed `Failed to load plugins` because the WebView served a cached `index.html` while the bundles had changed; the stale boot manifest missed `@deepseek-ai/dsh-client-runtime`, so `ui-theme` could not resolve `dsh-client-runtime/client`.
+- Files: packages/host/frontend-static/src/index.ts (index responses now send `cache-control: no-store`), packages/host/frontend-static/tests/frontend-static.spec.ts, README.md, README.zh.md.
+- Changes: every index response now forbids caching so the dynamically injected `__DSH_BOOT__` manifest is always fresh; the desktop bundle and custom installer were rebuilt from source; the user profile's invalid `plaindeck` marketplace entry was removed again.
+- Impact: rebuilding client bundles no longer leaves the WebView on a stale boot manifest, preventing `client-modules` module-table misses after upgrades or hot rebuilds.
+- Notes: if an already-open client still shows the error, close it and reopen it once so the WebView reloads the uncached index.
+
+### Agent-preset picker shows names only; installer rebuilt
+
+- Goal: the new-session agent-preset chip's menu listed every preset with its description sentence under the name, making the switch list long and wordy; the picker should name the modes (Standard mode, Code mode, Minimal mode, Creator mode) and nothing else.
+- Files: packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx (menu rows now render the name alone; the description line is gone), packages/client/ui-agent-preset/src/client/AgentPresetSeat.module.css (removed the now-unused `.itemDesc` rule), packages/client/ui-agent-preset/tests/components.client.spec.tsx (seat menu test now asserts names only and that the description and "no description" fallback are absent), apps/web/tests/agent-preset-selection.e2e.ts (menu scenario now asserts the four names and that the description sentence is absent), apps/web/tests/snapshots/agent-preset-selection/menu.expected.md (golden updated to name-only rows), apps/desktop/bundle, apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe, README.md, README.zh.md.
+- Changes: the new-session preset menu shows only the preset name per row. The description copy still lives in the settings Agent-preset section and on the session header tooltip; nothing else moved.
+- Impact: the preset switch menu is a short four-item list; settings-page and header surfaces are unchanged.
+- Notes: the desktop bundle was regenerated with the rebuilt `dsh-client-ui-agent-preset` artifacts and the installer exe was rebuilt (`dsh-desktop-installer build:setup`).
+
 ### User patch layer tolerance (marketplace plugins cannot block launch)
 
 - Goal: installing public marketplace plugins could write a non-Cordis package or a malformed `cordis.patch.yml` into the web profile, making the client stick on "Starting DeepSeek Harness..." because profile preparation or boot rejected the whole tree.

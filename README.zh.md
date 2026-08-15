@@ -87,6 +87,22 @@ build-desktop.bat
 
 ## 近期变更
 
+### WebView 启动清单缓存修复（client bundle 重建后不再报错）
+
+- 修改目标：Agent 预设对话框与 client bundle 重建后，客户端出现 `Failed to load plugins`；原因是 WebView 使用了缓存的旧 `index.html`，而 bundle 已变化，旧启动清单缺少 `@deepseek-ai/dsh-client-runtime`，导致 `ui-theme` 无法解析 `dsh-client-runtime/client`。
+- 修改文件：packages/host/frontend-static/src/index.ts（index 响应增加 `cache-control: no-store`）；packages/host/frontend-static/tests/frontend-static.spec.ts；README.md、README.zh.md。
+- 修改内容：所有 index 响应禁止缓存，确保动态注入的 `__DSH_BOOT__` 始终为最新；从源码重新构建桌面 bundle 与自定义安装器；再次清理用户 profile 中无效的 `plaindeck` 公共插件条目。
+- 影响范围：client bundle 重建后 WebView 不再使用旧启动清单，可避免升级或热重建后的 `client-modules` 模块表缺失报错。
+- 注意事项：如果已打开的客户端仍显示该错误，关闭客户端后重新打开一次，WebView 会加载未缓存的 index。
+
+### 预设切换菜单只显示名称；安装器重新构建
+
+- 修改目标：新会话界面的 Agent 预设切换菜单在名称下方还显示每个预设的描述句子，导致切换列表冗长；切换列表应只显示模式名称（标准模式、PTC 模式、极简模式、创造模式）。
+- 修改文件：packages/client/ui-agent-preset/src/client/AgentPresetSeat.tsx（菜单行只渲染名称，移除描述行）、packages/client/ui-agent-preset/src/client/AgentPresetSeat.module.css（删除不再使用的 `.itemDesc` 样式）、packages/client/ui-agent-preset/tests/components.client.spec.tsx（seat 菜单测试改为断言只显示名称、描述与“暂无描述”占位不再出现）、apps/web/tests/agent-preset-selection.e2e.ts（菜单场景改为断言四个名称且描述句子不出现）、apps/web/tests/snapshots/agent-preset-selection/menu.expected.md（golden 快照更新为仅名称行）、apps/desktop/bundle、apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe、README.md、README.zh.md。
+- 修改内容：新会话预设切换菜单每行只显示预设名称。描述文案仍保留在设置的 Agent 预设管理区和会话头部提示中，其余不变。
+- 影响范围：预设切换菜单变为四行的简短列表；设置页与会话头部展示不受影响。
+- 注意事项：桌面 bundle 已用重建后的 `dsh-client-ui-agent-preset` 产物重新生成，安装器 exe 已重新构建（`dsh-desktop-installer build:setup`）。
+
 ### 用户插件层容错（公共插件不再卡启动）
 
 - 修改目标：安装公共插件市场的插件时，可能向 web profile 写入非 Cordis 插件或损坏的 `cordis.patch.yml`，导致 profile 准备或启动阶段拒绝整棵插件树，客户端卡在 “Starting DeepSeek Harness...”。

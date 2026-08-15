@@ -209,17 +209,19 @@ describe('the new-session chip', () => {
     expect(screen.getByRole('button').getAttribute('title')).toBe(en.seatHint)
   })
 
-  it('offers each preset with what it is for', () => {
+  it('offers each preset by name alone', () => {
     renderSeat()
 
     fireEvent.click(screen.getByRole('button'))
 
-    // The id alone never said what a preset does; the description is the
-    // whole reason a preset can publish metadata at all.
-    expect(screen.getByText(en.presetStandardDescription)).toBeTruthy()
+    // The switch list stays short: the name alone, with the description
+    // copy living in the settings section. The chip and the menu row both
+    // name the staged preset, so the name appears more than once.
+    expect(screen.getAllByText(en.presetStandardName).length).toBeGreaterThanOrEqual(2)
+    expect(screen.queryByText(en.presetStandardDescription)).toBeNull()
+    expect(screen.queryByText(en.noDescription)).toBeNull()
     // A preset that published none still reads as a row, with its id standing
     // in for the name.
-    expect(screen.getByText(en.noDescription)).toBeTruthy()
     expect(screen.getByText('mine')).toBeTruthy()
   })
 

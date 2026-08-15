@@ -96,8 +96,8 @@
   color: var(--dsw-alias-label-caption);
 }
 
-/* Menu rows carry the name over its description: the id alone never said what
-   a preset does, which is why the metadata exists. */
+/* Menu rows stay short: the name alone — the settings section carries the
+   description copy. */
 .item {
   display: flex;
   flex-direction: column;
@@ -109,11 +109,4 @@
   font-size: 13px;
   line-height: 20px;
   color: var(--dsw-alias-label-primary);
-}
-
-.itemDesc {
-  font-size: 12px;
-  line-height: 16px;
-  color: var(--dsw-alias-label-caption);
-  white-space: normal;
 }

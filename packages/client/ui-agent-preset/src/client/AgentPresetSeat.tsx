@@ -133,12 +133,11 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
         const text = presetDisplayText(option, t)
         return {
           id: option.id,
-          // Name and description together: the id alone never says what a
-          // preset does, which is why the roster carries display copy.
+          // The switch list stays short: the name alone, with the
+          // description copy living in the settings section.
           label: (
             <span className={css.item}>
               <span className={css.itemName}>{text.name}</span>
-              <span className={css.itemDesc}>{text.description ?? t('noDescription')}</span>
             </span>
           ),
         }
