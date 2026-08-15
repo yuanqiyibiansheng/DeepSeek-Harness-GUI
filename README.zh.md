@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### 恢复 Agent 预设设置页的描述
+
+- 修改目标：Agent 预设管理页不再显示每个预设的描述和标识，因为对话框编辑时移除了卡片主体渲染；对应的 CSS 与测试仍然存在。
+- 修改文件：packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx（恢复 `CardDescription` 与卡片 id 行）；README.md、README.zh.md。
+- 修改内容：每个预设卡片恢复显示本地化/自定义描述（缺失时显示“暂无描述”），描述被卡片截断时悬停显示完整内容，并恢复预设 id；保留新加的“创造模式”入口等对话框修改。已从源码重新构建桌面 bundle 与自定义安装器。
+- 影响范围：设置中的 Agent 预设卡片重新显示完整描述；新会话选择器仍只显示名称。
+- 注意事项：需重新安装重建后的安装器才能看到恢复的描述。
+
 ### WebView 启动清单缓存修复（client bundle 重建后不再报错）
 
 - 修改目标：Agent 预设对话框与 client bundle 重建后，客户端出现 `Failed to load plugins`；原因是 WebView 使用了缓存的旧 `index.html`，而 bundle 已变化，旧启动清单缺少 `@deepseek-ai/dsh-client-runtime`，导致 `ui-theme` 无法解析 `dsh-client-runtime/client`。
