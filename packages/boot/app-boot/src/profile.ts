@@ -459,9 +459,16 @@ export function loadProfile(
     }
   }
   const patchPath = join(dir, PROFILE_PATCH_FILENAME)
-  const patches = options.userLayer !== false && existsSync(patchPath)
-    ? loadOverlayPatches(binName, patchPath)
-    : []
+  const patches: PatchOptions[] = []
+  if (options.userLayer !== false && existsSync(patchPath)) {
+    try {
+      patches.push(...loadOverlayPatches(binName, patchPath))
+    } catch (error) {
+      // A broken marketplace-installed user layer must not block the desktop
+      // client on its launch screen; skip the layer and let the app open.
+      process.stderr.write(`${binName}: warning: skipping unreadable user patch layer ${patchPath}: ${error instanceof Error ? error.message : String(error)}\n`)
+    }
+  }
   return { name, dir, layers, patchPath, patches }
 }
 

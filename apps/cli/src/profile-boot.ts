@@ -128,6 +128,16 @@ function allPatches(composed: ComposedProfile): PatchOptions[] {
   ]
 }
 
+/** Read a user patch file, treating a missing or broken file as no patch layer. */
+function readUserPatches(file: string): PatchOptions[] {
+  try {
+    return loadOptionalPatches(NAME, file) ?? []
+  } catch (error) {
+    process.stderr.write(`${NAME}: warning: skipping unreadable user patch layer ${file}: ${error instanceof Error ? error.message : String(error)}\n`)
+    return []
+  }
+}
+
 /**
  * Load `name` and compose its effective patch stack: bundle layers in
  * `dsh.profile.bundles` order (the base bundle gates the shell stacks by
@@ -144,7 +154,7 @@ function composeProfile(
   patchFiles: readonly string[],
 ): ComposedProfile {
   const profile = prepareProfile(name)
-  const homePatches = loadOptionalPatches(NAME, homePatchPath()) ?? []
+  const homePatches = readUserPatches(homePatchPath())
   const overlays = patchFiles.flatMap(file => loadOverlayPatches(NAME, resolve(file)))
   const bundlePatches = profile.layers.flatMap(layer => layer.patches)
   const rows = new Map<string, EntryOptions>()
@@ -239,13 +249,11 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // removing the override could never revert the row to the bundle default.
   const composeLive = (): PatchOptions[] => structuredClone([
     ...composed.bundlePatches,
-    ...loadOptionalPatches(NAME, composed.profile.patchPath) ?? [],
-    ...loadOptionalPatches(NAME, homePatchPath()) ?? [],
+    ...readUserPatches(composed.profile.patchPath),
+    ...readUserPatches(homePatchPath()),
     ...composed.overlays,
   ])
-  // Cloned for the same insert-aliasing reason as composeLive: the boot
-  // application must not mutate the objects later reloads recompose from.
-  const ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), (hostCtx) => {
+  const provideHost = (hostCtx: Context): void => {
     app.current = hostCtx
     // Before any config-tree entry mounts, so plugins resolve all launch-time
     // environment values from the same immutable provenance snapshot.
@@ -256,7 +264,28 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
       args: options.args,
       exit: code => void shutdown.shutdown(code),
     })
-  })
+  }
+  // Cloned for the same insert-aliasing reason as composeLive: the boot
+  // application must not mutate the objects later reloads recompose from.
+  let userLayerActive = true
+  let ctx: Context
+  try {
+    ctx = await boot(NAME, rootConfig, structuredClone(allPatches(composed)), provideHost)
+  } catch (error) {
+    // A broken user patch row (for example a marketplace install that wrote a
+    // non-Cordis package into `cordis.patch.yml`) must not keep the desktop
+    // client stuck on its launch screen. Retry with bundle and overlay layers
+    // only; the user layer can be repaired or removed after the app is open.
+    userLayerActive = false
+    const detail = error instanceof Error ? error.message : String(error)
+    process.stderr.write(`${NAME}: warning: user patch layer failed to load; retrying without it: ${detail}\n`)
+    ctx = await boot(
+      NAME,
+      rootConfig,
+      structuredClone([...composed.bundlePatches, ...composed.overlays]),
+      provideHost,
+    )
+  }
   app.current = ctx
   // A surface can dispose the whole tree while boot or this post-boot watcher
   // setup is still in flight — a signal, or a fast one-shot's appExit. Loader
@@ -265,7 +294,8 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // landed mid-setup. Watching is unconditional: a one-shot surface exits
   // through its bounded shutdown, which disposes the watchers before the
   // loop drains.
-  if (!signalShutdown.signal.aborted
+  if (userLayerActive
+    && !signalShutdown.signal.aborted
     && ctx.fiber.state === FiberState.ACTIVE
     && ctx.get('loader') !== undefined) {
     try {

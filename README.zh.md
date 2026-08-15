@@ -87,6 +87,22 @@ build-desktop.bat
 
 ## 近期变更
 
+### 用户插件层容错（公共插件不再卡启动）
+
+- 修改目标：安装公共插件市场的插件时，可能向 web profile 写入非 Cordis 插件或损坏的 `cordis.patch.yml`，导致 profile 准备或启动阶段拒绝整棵插件树，客户端卡在 “Starting DeepSeek Harness...”。
+- 修改文件：packages/boot/app-boot/src/profile.ts（loadProfile 遇到无法解析的 `cordis.patch.yml` 时记录警告并跳过，不再失败）、apps/cli/src/profile-boot.ts（home/profile 用户 patch 读取失败时降级为空层；首次 boot 失败后自动去掉用户层重试）、packages/boot/app-boot/tests/profile.spec.ts（新增损坏用户层与无 bundle 清单的容错测试）、README.md、README.zh.md。
+- 修改内容：用户 patch 层改为尽力加载。格式损坏、仅注释或非数组文件会跳过并输出警告；若组合后的用户层在 boot 阶段仍失败，启动器会仅用 bundle 层与 overlay 层重试。当前 web profile 已清理：移除无效的 `pm-plaindeck` 插入和空的 `@microi.net/cli` bundle 条目。
+- 影响范围：损坏的公共插件不再阻止桌面端打开；官方 bundle 层错误仍会明确失败。
+- 注意事项：跳过的用户层会向 stderr 输出警告；可在设置中移除或修复问题插件后重启恢复。
+
+### 插件市场安装反馈与一键重启服务
+
+- 修改目标：点击安装后，结果卡片按钮又变回"安装"（只有下方已安装列表刷新），成功看起来像失败；且新插件要等服务重启才出现在设置 → 插件列表，界面里没有重启入口。
+- 修改文件：packages/client/ui-plugin-marketplace/src/client/MarketplaceTab.tsx（安装/卸载成功后立即更新结果卡片的已安装状态，按钮如实变为已安装/卸载；成功提示旁新增"立即重启"按钮）、packages/client/ui-plugin-marketplace/src/client/marketplace.module.css（重启按钮样式）、apps/desktop/src-tauri/src/lib.rs（restart_service 命令：杀掉后端子进程、重新启动后端、重载主窗口与桌宠窗口；后端启动逻辑提取为 spawn_backend）、apps/desktop/src-tauri/build.rs（应用命令清单加 restart_service）、apps/desktop/src-tauri/capabilities/default.json（allow-restart-service）、README.md、README.zh.md。
+- 修改内容：安装/卸载后结果卡片即时更新；安装成功后提示可一键重启，重启会重载 dsh 服务，新插件随即激活并出现在插件列表。
+- 影响范围：插件市场操作期间按钮状态真实可信，激活已装插件只需一次点击。
+- 注意事项：重启会中断当前正在运行的会话（历史保留）；按钮只在桌面壳内出现。
+
 ### 桌面端与安装器源码重建
 
 - 修改目标：防止公共插件导致的启动失败再次发生，并用最新源码重新生成桌面端和自定义安装器；同时清理误写入 `packages/*/*/src` 的 TypeScript 编译产物。
