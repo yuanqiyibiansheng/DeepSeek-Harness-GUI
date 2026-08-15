@@ -150,7 +150,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       if (lw > 0) x = Math.min(Math.max(x, MARGIN), vw - lw - MARGIN)
       if (lh > 0) y = Math.min(Math.max(y, MARGIN), vh - lh - MARGIN)
 
-      setFixedPos({ left: x, top: y })
+      // The portaled list matches the anchor's width (the NexBox-style
+      // dropdown: the popup is as wide as its trigger), so placement anchors
+      // on the anchor's left edge and carries its width.
+      setFixedPos({ left: r.left, top: y, width: r.width })
     }
     // First run measures the hidden pre-render (same commit as `open`), so
     // end/top alignment and clamping use real dimensions before anything

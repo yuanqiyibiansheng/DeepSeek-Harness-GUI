@@ -39,11 +39,14 @@
 /* Portal mode: fixed in the viewport, coordinates supplied inline from the
  * anchor rect (side/align resolved in JS, the in-place offset rules above
  * don't apply). Portaled lists must layer above modal overlays (z 1000) —
- * an anchor inside a dialog still expects its menu on top. */
+ * an anchor inside a dialog still expects its menu on top. The inline width
+ * follows the anchor (NexBox-style: popup as wide as its trigger), so the
+ * fixed card min-width must not override it. */
 .portal {
   position: fixed;
   top: auto;
   left: auto;
+  min-width: 0;
   z-index: 1100;
 }
 

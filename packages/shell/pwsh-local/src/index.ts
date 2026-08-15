@@ -16,6 +16,9 @@
 /* jscpd:ignore-start -- this executor mirrors dsh-bash-local call-for-call by
    design (see this package's README), so the two import the same seam surface */
 import { Context } from '@deepseek-ai/cordis'
+import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
 import { SHELL_SETTINGS_NAMESPACE, ShellExecutor } from '@deepseek-ai/dsh-shell'
 import type { ShellExecRequest, ShellExecSpec, ShellProcess, ShellProcessRead, ShellRunResult, CollectedOutput } from '@deepseek-ai/dsh-shell'
@@ -213,9 +216,54 @@ export class PwshLocalExecutor extends ShellExecutor {
    * confining subclass wraps through `ctx.sandbox.confine` (the pwsh twin of
    * `dsh-bash-local`'s `runArgv`/`startArgv` hooks; see
    * `@deepseek-ai/dsh-pwsh-sandbox`).
+   *
+   * The user's integrated-terminal shell preference (`terminal.shell`) can
+   * switch the executing shell per call: `cmd` runs `cmd /d /s /c`, `git-bash`
+   * runs Git Bash's `bash -c`, `wsl` runs `wsl bash -c`, and everything else
+   * keeps the PowerShell dialect.
    */
   protected argv(spec: ShellExecSpec): string[] {
+    const mode = this.terminalShellMode()
+    if (mode === 'cmd') return ['cmd.exe', '/d', '/s', '/c', spec.command]
+    if (mode === 'git-bash') return [this.gitBashPath(), '-c', spec.command]
+    if (mode === 'wsl') return ['wsl.exe', 'bash', '-c', spec.command]
     return [this.pwshPath, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', `${ENCODING_PREAMBLE}${spec.command}`]
+  }
+
+  /** The selectable integrated-terminal shell modes. */
+  private static readonly TERMINAL_SHELL_MODES = new Set(['pwsh', 'powershell', 'cmd', 'git-bash', 'wsl'])
+
+  /** Read the user's `terminal.shell` preference, or undefined when unset. */
+  private terminalShellMode(): string | undefined {
+    const settings = this.ctx.get('settings')
+    if (settings === undefined) return undefined
+    let shell: unknown
+    for (const row of settings.describe()) {
+      if (String(row.ns) === 'terminal') {
+        shell = (row.value as { shell?: unknown } | undefined)?.shell
+        break
+      }
+    }
+    return typeof shell === 'string' && PwshLocalExecutor.TERMINAL_SHELL_MODES.has(shell) ? shell : undefined
+  }
+
+  /** Resolve a Git Bash executable (PATH entry or a well-known install path). */
+  private gitBashPath(): string {
+    const envRoot = process.env.PROGRAMFILES ?? 'C:\\Program Files'
+    const candidates = [
+      'bash.exe',
+      join(envRoot, 'Git', 'bin', 'bash.exe'),
+      join(process.env['PROGRAMFILES(X86)'] ?? 'C:\\Program Files (x86)', 'Git', 'bin', 'bash.exe'),
+    ]
+    for (const candidate of candidates) {
+      if (candidate === 'bash.exe') {
+        const probe = spawnSync('where.exe', ['bash.exe'], { stdio: 'ignore' })
+        if (probe.status === 0) return candidate
+        continue
+      }
+      if (existsSync(candidate)) return candidate
+    }
+    throw new Error('pwsh-local: git-bash mode selected but bash.exe was not found')
   }
 
   /** Map one resolved spec plus its argv onto a fully-specified subprocess spawn. */

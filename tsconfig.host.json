@@ -195,6 +195,7 @@
     { "path": "./packages/shell/shell" },
     { "path": "./packages/terminal/terminal" },
     { "path": "./packages/terminal/terminal-bash" },
+    { "path": "./packages/terminal/terminal-host" },
     { "path": "./packages/shell/tool-bash-persistent" },
     { "path": "./packages/terminal/tool-terminal" },
     { "path": "./packages/code-runtime/code-runtime" },

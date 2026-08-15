@@ -311,6 +311,11 @@ export class E2BTerminalHandle implements SubprocessTerminalHandle {
   }
 
   /** @inheritdoc */
+  resize(_cols: number, _rows: number): Promise<void> {
+    return Promise.reject(new Error('subprocess-e2b: terminal resize is not supported by the E2B provider'))
+  }
+
+  /** @inheritdoc */
   inspectForeground(): Promise<SubprocessTerminalForeground | undefined> {
     return this.trackOperation(signal => this.inspectForegroundOnce(signal))
   }

@@ -357,6 +357,43 @@ class MacProcessInspector extends PosixProcessInspector {
 }
 
 /**
+ * Windows has no /proc or ps-equivalent process-table primitive wired here,
+ * so the terminal backend degrades: node-pty spawn/write/resize work, while
+ * foreground inspection, descendant tracking, and signal delivery report
+ * nothing (readiness and process-tree teardown are unavailable; terminate
+ * stops the top-level shell only).
+ */
+class NullProcessInspector implements ProcessInspector {
+  foregroundPgid(_shellPid: number): number | undefined {
+    return undefined
+  }
+
+  isStdinWaiting(_pgid: number): boolean {
+    return false
+  }
+
+  processTree(rootPid: number): ProcessIdentity[] {
+    return [{ pid: rootPid, started: '' }]
+  }
+
+  processSession(_sessionId: number): ProcessIdentity[] {
+    return []
+  }
+
+  isAlive(_identity: ProcessIdentity): boolean {
+    return false
+  }
+
+  signalGroup(_pgid: number, _signal: SubprocessTerminalSignal): void {
+    // Nothing to signal without process-group inspection.
+  }
+
+  signalProcess(_identity: ProcessIdentity, _signal: 'SIGTERM' | 'SIGKILL'): void {
+    // Nothing to signal without process-table inspection.
+  }
+}
+
+/**
  * Create the supported platform inspector or fail at plugin load.
  * @param platform - target Node platform.
  * @param arch - target CPU architecture for Linux syscall numbers.
@@ -370,5 +407,6 @@ export function createProcessInspector(
 ): ProcessInspector {
   if (platform === 'linux') return new LinuxProcessInspector(arch, internals)
   if (platform === 'darwin') return new MacProcessInspector(internals)
+  if (platform === 'win32') return new NullProcessInspector()
   throw new Error(`subprocess-local: terminal inspection is unsupported on platform ${platform}`)
 }

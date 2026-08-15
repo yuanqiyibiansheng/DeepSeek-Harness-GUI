@@ -47,4 +47,6 @@ export type { MarkdownCodeLabels, MarkdownFileMentions } from './markdown/Markdo
 export { MessageText } from './markdown/MessageText.tsx'
 export { extractMarkdownPlainText } from './markdown/plain-text.ts'
 export type { MarkdownPlainTextMode, MarkdownPlainTextOptions } from './markdown/plain-text.ts'
+export { highlightLines } from './markdown/highlight.ts'
+export type { HighlightSpan } from './markdown/highlight.ts'
 export * from './icons/index.tsx'

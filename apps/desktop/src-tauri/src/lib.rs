@@ -5,11 +5,45 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use tauri::{AppHandle, Manager, RunEvent};
+use tauri::{AppHandle, Manager, RunEvent, WebviewWindow, WindowEvent};
 use url::Url;
 
 mod diff_server;
 struct BackendState(Mutex<Option<Child>>);
+
+/// Persisted outer size of the main window, restored on the next launch.
+struct WindowSize { width: u32, height: u32 }
+
+fn window_size_path(app: &AppHandle) -> Option<PathBuf> {
+  app.path().app_data_dir().ok().map(|dir| dir.join("window-size.json"))
+}
+
+fn load_window_size(app: &AppHandle) -> Option<WindowSize> {
+  let path = window_size_path(app)?;
+  let text = std::fs::read_to_string(path).ok()?;
+  let json: serde_json::Value = serde_json::from_str(&text).ok()?;
+  let width = json.get("width")?.as_u64()? as u32;
+  let height = json.get("height")?.as_u64()? as u32;
+  if width == 0 || height == 0 { return None }
+  Some(WindowSize { width, height })
+}
+
+fn save_window_size(app: &AppHandle, size: tauri::PhysicalSize<u32>) {
+  let Some(path) = window_size_path(app) else { return };
+  if let Some(parent) = path.parent() {
+    let _ = std::fs::create_dir_all(parent);
+  }
+  let _ = std::fs::write(path, format!(r#"{{"width":{},"height":{}}}"#, size.width, size.height));
+}
+
+/// Restore the persisted window size (clamped to the configured minimums by
+/// the window itself) and center the window on the primary monitor.
+fn restore_and_center(window: &WebviewWindow, app: &AppHandle) {
+  if let Some(size) = load_window_size(app) {
+    let _ = window.set_size(tauri::PhysicalSize::new(size.width, size.height));
+  }
+  let _ = window.center();
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -31,6 +65,16 @@ pub fn run() {
       let window = app
         .get_webview_window("main")
         .ok_or_else(|| "main window not found".to_string())?;
+      // Persist the window size on every resize so the next launch restores it.
+      {
+        let save_handle = app.handle().clone();
+        window.on_window_event(move |event| {
+          if let WindowEvent::Resized(size) = event {
+            save_window_size(&save_handle, *size);
+          }
+        });
+      }
+      restore_and_center(&window, &handle);
       thread::spawn(move || {
         match start_backend(&handle) {
           Ok((child, port)) => {

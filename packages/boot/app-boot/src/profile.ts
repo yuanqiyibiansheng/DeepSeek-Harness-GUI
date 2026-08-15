@@ -167,6 +167,51 @@ export function initProfile(dir: string, bundles: readonly string[]): void {
   if (!existsSync(workspacePath)) writeFileSync(workspacePath, PROFILE_PNPM_WORKSPACE)
 }
 
+/** Retry delay between stale-fallback-link unlink attempts, in milliseconds. */
+const FALLBACK_UNLINK_RETRY_DELAY_MS = 200
+/** Retry budget for one stale-fallback-link unlink (plus the first attempt). */
+const FALLBACK_UNLINK_RETRIES = 5
+
+/** Block the current thread for `ms` milliseconds (this module is fully synchronous). */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * Replace one stale fallback link. On Windows a live process holding the
+ * reparse point (or a file under its target) makes unlink fail with EPERM or
+ * EBUSY until the holder releases it — typically a previously launched app
+ * instance still walking this fallback. Retry briefly so a transient holder
+ * (startup race, antivirus scan) self-heals; a persistent holder fails loud
+ * with the link, the wanted target, and the remedy instead of a bare EPERM
+ * that aborts the whole boot.
+ * @param link - the stale fallback link path.
+ * @param target - the link's desired target, for the failure message.
+ */
+function unlinkWithRetry(link: string, target: string): void {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= FALLBACK_UNLINK_RETRIES; attempt++) {
+    try {
+      unlinkSync(link)
+      return
+    } catch (error) {
+      // A concurrent launcher already removed the link — success.
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return
+      lastError = error
+      const code = (error as NodeJS.ErrnoException).code
+      if ((code === 'EPERM' || code === 'EBUSY') && attempt < FALLBACK_UNLINK_RETRIES) {
+        sleepSync(FALLBACK_UNLINK_RETRY_DELAY_MS)
+        continue
+      }
+      break
+    }
+  }
+  throw new Error(
+    `dsh: cannot replace stale fallback link ${link} (wanted target ${target}): ${String(lastError)}; `
+    + 'close other DeepSeek Harness instances and retry',
+  )
+}
+
 /** Ensure `link` is a symlink to `target`, replacing a wrong or dangling link; a real directory throws. */
 function ensureSymlink(link: string, target: string): void {
   let stat
@@ -183,8 +228,10 @@ function ensureSymlink(link: string, target: string): void {
     }
     if (readlinkSync(link) === target) return
     // unlink deletes the reparse point itself on Windows too; rmSync treats a
-    // junction as a directory and throws EISDIR unless recursive.
-    unlinkSync(link)
+    // junction as a directory and throws EISDIR unless recursive. A live
+    // holder (another app instance walking the fallback) fails the unlink with
+    // EPERM/EBUSY until it releases — unlinkWithRetry absorbs that transient.
+    unlinkWithRetry(link, target)
   }
   try {
     symlinkSync(target, link, 'junction')
