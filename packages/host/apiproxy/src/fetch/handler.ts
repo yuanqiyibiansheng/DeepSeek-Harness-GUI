@@ -71,6 +71,7 @@ import {
   credentialsDescribeRequestSchema, credentialsSetRequestSchema, credentialsUnsetRequestSchema,
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsRequestSchema, llmModelsRequestSchema, llmProvidersRequestSchema } from '../api/llm.schema.ts'
+import { visionEnableRequestSchema, visionStatusRequestSchema, visionTestRequestSchema } from '../api/vision.schema.ts'
 import {
   subagentHistoryRequestSchema,
   subagentInterruptRequestSchema,
@@ -156,6 +157,9 @@ const UNARY_ROUTES: UnaryRoutes = {
   'llm.providers': { schema: llmProvidersRequestSchema, invoke: (api, r) => api.llm.providers(r) },
   'llm.models': { schema: llmModelsRequestSchema, invoke: (api, r) => api.llm.models(r) },
   'llm.discoverModels': { schema: llmDiscoverModelsRequestSchema, invoke: (api, r, signal) => api.llm.discoverModels(r, signal) },
+  'vision.status': { schema: visionStatusRequestSchema, invoke: (api, r) => api.vision.status(r) },
+  'vision.test': { schema: visionTestRequestSchema, invoke: (api, r, signal) => api.vision.test(r, signal) },
+  'vision.enable': { schema: visionEnableRequestSchema, invoke: (api, r, signal) => api.vision.enable(r, signal) },
 }
 
 /** Route lookup that narrows an arbitrary path segment to a map key (single cast point for the string→key refinement). */

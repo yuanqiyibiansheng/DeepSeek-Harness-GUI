@@ -1,0 +1,31 @@
+/* Floating desktop pet styles (animation sprites ported from cc-haha). */
+
+.dock {
+  position: fixed;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+
+.mascot {
+  pointer-events: auto;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+  user-select: none;
+}
+
+.mascot:active {
+  cursor: grabbing;
+}
+
+.spriteStage {
+  flex: none;
+  overflow: visible;
+}
+
+.sprite {
+  display: block;
+}

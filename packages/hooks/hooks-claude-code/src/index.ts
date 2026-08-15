@@ -101,7 +101,7 @@ export function apply(ctx: Context, config: Config): void {
   // Parse once at load. A read or parse failure logs and registers nothing.
   let parsed: ClaudeCodeHookConfig = {}
   try {
-    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8'))
+    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8').replace(/^\uFEFF/, ''))
     const result = parseClaudeCodeConfig(raw, {
       ...config.pluginRoot !== undefined ? { pluginRoot: config.pluginRoot } : {},
       ...config.projectDir !== undefined ? { projectDir: config.projectDir } : {},

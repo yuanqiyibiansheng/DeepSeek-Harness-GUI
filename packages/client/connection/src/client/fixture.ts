@@ -2979,6 +2979,11 @@ function createFixtureWorld(options: FixtureOptions): FixtureWorld {
         models: fixtureModelGroups().flatMap(group => group.models.map(model => ({ id: model.id, name: model.name }))),
       }),
     },
+    vision: {
+      status: request => ok(request, { enabled: false, configured: false, model: 'qwen3.8-max', apiKeyUrl: 'https://help.aliyun.com/zh/model-studio/get-api-key' }),
+      test: request => err(request, { code: 'internal', message: 'fixture: vision test disabled', details: {} }),
+      enable: request => err(request, { code: 'internal', message: 'fixture: vision enable disabled', details: {} }),
+    },
     respond(message: ClientResponse): Promise<RpcReceipt> {
       // Same routing discipline as the host: rpcId first, then the payload's
       // audit correlation; a settled or unknown id is not-pending.
@@ -3161,6 +3166,9 @@ export class FixtureApiClient extends AbstractApiClient {
       case 'llm.providers': return this.api.llm.providers(request)
       case 'llm.models': return this.api.llm.models(request)
       case 'llm.discoverModels': return this.api.llm.discoverModels(request, signal)
+      case 'vision.status': return this.api.vision.status(request)
+      case 'vision.test': return this.api.vision.test(request, signal)
+      case 'vision.enable': return this.api.vision.enable(request, signal)
     }
   }
 

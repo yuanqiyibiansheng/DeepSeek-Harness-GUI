@@ -20,6 +20,19 @@
         "resizable": true,
         "fullscreen": false,
         "center": true
+      },
+      {
+        "label": "pet",
+        "title": "DeepSeek 桌宠",
+        "width": 240,
+        "height": 260,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ],
     "security": {
@@ -29,7 +42,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
-    "resources": ["../bundle/node", "../bundle/dsh"],
+    "resources": ["../bundle/node", "../bundle/dsh", "../bundle/npm"],
     "icon": [
       "icons/icon.ico"
     ]

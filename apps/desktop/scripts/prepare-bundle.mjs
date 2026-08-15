@@ -46,7 +46,28 @@ cleanRuntimeFiles()
 
 mkdirSync(nodeDir, { recursive: true })
 cpSync(process.execPath, nodeExe, { force: true, dereference: true })
+bundleNpm()
 console.log(`desktop bundle ready: ${bundleDir}`)
+
+/**
+ * Bundle the npm CLI beside the bundled node so the plugin marketplace can
+ * install packages on machines without a Node/npm installation. The npm
+ * package is installed into `<bundle>/npm` via the system npm; the host half
+ * of ui-plugin-marketplace finds it at `<root>/npm/node_modules/npm`.
+ */
+function bundleNpm() {
+  const npmDir = join(bundleDir, 'npm')
+  mkdirSync(npmDir, { recursive: true })
+  const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  execFileSync(
+    npmCommand,
+    ['install', '--prefix', npmDir, 'npm@10', '--no-audit', '--no-fund', '--no-progress'],
+    { stdio: 'inherit', shell: true },
+  )
+  if (!existsSync(join(npmDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'))) {
+    throw new Error('npm bundle incomplete: npm-cli.js missing after install')
+  }
+}
 
 function copyWorkspacePackages() {
   const rels = new Set(['apps/cli', 'apps/web'])

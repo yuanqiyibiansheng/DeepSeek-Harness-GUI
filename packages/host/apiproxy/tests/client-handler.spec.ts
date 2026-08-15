@@ -28,6 +28,7 @@ function scriptedApi(overrides: {
   settings?: Partial<ApiProxy['settings']>
   credentials?: Partial<ApiProxy['credentials']>
   llm?: Partial<ApiProxy['llm']>
+  vision?: Partial<ApiProxy['vision']>
   pluginMarket?: Partial<ApiProxy['pluginMarket']>
   respond?: ApiProxy['respond']
 } = {}): ApiProxy {
@@ -138,6 +139,12 @@ function scriptedApi(overrides: {
       models: r => ok(r, { groups: [], failures: [] }),
       discoverModels: err,
       ...overrides.llm,
+    },
+    vision: {
+      status: r => ok(r, { enabled: false, configured: false, model: 'qwen3.8-max', apiKeyUrl: 'https://help.aliyun.com/zh/model-studio/get-api-key' }),
+      test: err,
+      enable: err,
+      ...overrides.vision,
     },
     events: { mux: () => empty<MuxFrame>(), host: () => empty<HostFrame>(), ...overrides.events },
     respond: overrides.respond ?? (() => Promise.resolve({ accepted: false as const, reason: 'not-pending' as const })),

@@ -236,6 +236,12 @@ export class FakeApiClient implements IApiClient {
     discoverModels: payload => this.record('llm.discoverModels', payload, Promise.resolve(ok({ models: [] }))),
   }
 
+  readonly vision: IApiClient['vision'] = {
+    status: payload => this.record('vision.status', payload, Promise.resolve(ok({ enabled: false, configured: false, model: 'qwen3.8-max', apiKeyUrl: 'https://help.aliyun.com/zh/model-studio/get-api-key' }))),
+    test: payload => this.record('vision.test', payload, Promise.resolve(ok({ model: 'qwen3.8-max', description: 'fake' }))),
+    enable: payload => this.record('vision.enable', payload, Promise.resolve(ok({ model: 'qwen3.8-max', description: 'fake' }))),
+  }
+
   /** When true, streams never fire onOpen (misbehaving-carrier material for the handshake timeout guard). */
   suppressStreamOpen = false
 

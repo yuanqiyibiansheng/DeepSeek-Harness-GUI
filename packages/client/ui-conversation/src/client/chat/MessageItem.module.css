@@ -1,5 +1,5 @@
 /* User bubble: right-aligned column (bubble + IconActions). Figma
-   User_Bubble/message_container 659:38813 — r22 fill, actions gap 6 below. */
+   User_Bubble/message_container 659:38813 鈥?r22 fill, actions gap 6 below. */
 
 .userRow {
   display: flex;
@@ -34,7 +34,7 @@
 
 /* Compaction marker: one dim 24px row with a context icon at rest and a
    hover/focus disclosure for the summary body. Dimmed title (not
-   label-primary) — the row is a boundary notice, not conversation content. */
+   label-primary) 鈥?the row is a boundary notice, not conversation content. */
 .compactionRow {
   padding: 2px 0;
 }
@@ -269,7 +269,7 @@
 }
 
 /* Reference chip projection inside a user bubble (`<skill>name</skill>` model
-   spans render as chips; free geometry — no textarea pairing here). */
+   spans render as chips; free geometry 鈥?no textarea pairing here). */
 .refChip {
   display: inline-block;
   margin: 0 2px;

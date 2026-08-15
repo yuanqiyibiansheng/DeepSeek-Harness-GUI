@@ -1,0 +1,67 @@
+/* Standalone pet window page: transparent full-window stage. */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  user-select: none;
+}
+
+.window {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 4px;
+}
+
+.mascot {
+  cursor: grab;
+  outline: none;
+}
+
+.mascot:active {
+  cursor: grabbing;
+}
+
+/* Right-click hide menu (window-local, semi-transparent dark card). */
+.menu {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(10, 15, 30, 0.92);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.menuItem {
+  border: 0;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: transparent;
+  color: #dbe4ff;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}

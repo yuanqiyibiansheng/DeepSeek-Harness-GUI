@@ -14,8 +14,15 @@ struct BackendState(Mutex<Option<Child>>);
 /// Persisted outer size of the main window, restored on the next launch.
 struct WindowSize { width: u32, height: u32 }
 
+/// Persisted screen position of the pet window, restored on the next launch.
+struct PetPosition { x: i32, y: i32 }
+
 fn window_size_path(app: &AppHandle) -> Option<PathBuf> {
   app.path().app_data_dir().ok().map(|dir| dir.join("window-size.json"))
+}
+
+fn pet_position_path(app: &AppHandle) -> Option<PathBuf> {
+  app.path().app_data_dir().ok().map(|dir| dir.join("pet-position.json"))
 }
 
 fn load_window_size(app: &AppHandle) -> Option<WindowSize> {
@@ -28,12 +35,29 @@ fn load_window_size(app: &AppHandle) -> Option<WindowSize> {
   Some(WindowSize { width, height })
 }
 
+fn load_pet_position(app: &AppHandle) -> Option<PetPosition> {
+  let path = pet_position_path(app)?;
+  let text = std::fs::read_to_string(path).ok()?;
+  let json: serde_json::Value = serde_json::from_str(&text).ok()?;
+  let x = json.get("x")?.as_i64()? as i32;
+  let y = json.get("y")?.as_i64()? as i32;
+  Some(PetPosition { x, y })
+}
+
 fn save_window_size(app: &AppHandle, size: tauri::PhysicalSize<u32>) {
   let Some(path) = window_size_path(app) else { return };
   if let Some(parent) = path.parent() {
     let _ = std::fs::create_dir_all(parent);
   }
   let _ = std::fs::write(path, format!(r#"{{"width":{},"height":{}}}"#, size.width, size.height));
+}
+
+fn save_pet_position(app: &AppHandle, position: tauri::PhysicalPosition<i32>) {
+  let Some(path) = pet_position_path(app) else { return };
+  if let Some(parent) = path.parent() {
+    let _ = std::fs::create_dir_all(parent);
+  }
+  let _ = std::fs::write(path, format!(r#"{{"x":{},"y":{}}}"#, position.x, position.y));
 }
 
 /// Restore the persisted window size (clamped to the configured minimums by
@@ -55,6 +79,7 @@ pub fn run() {
         let _ = window.unminimize();
       }
     }))
+    .invoke_handler(tauri::generate_handler![pet_control])
     .setup(|app| {
       app.manage(BackendState(Mutex::new(None)));
       if let Ok(data_dir) = app.path().app_data_dir() {
@@ -74,7 +99,35 @@ pub fn run() {
           }
         });
       }
+      // Closing the main window must also close the pet window: with the pet
+      // still open the app would keep running and the desktop pet would outlive
+      // the client.
+      {
+        let close_handle = app.handle().clone();
+        window.on_window_event(move |event| {
+          if let WindowEvent::CloseRequested { .. } = event {
+            if let Some(pet) = close_handle.get_webview_window("pet") {
+              let _ = pet.close();
+            }
+          }
+        });
+      }
       restore_and_center(&window, &handle);
+      // The pet window stays hidden until the web client decides to show it
+      // (pet.enabled setting). Restore its last screen position.
+      if let Some(pet) = app.get_webview_window("pet") {
+        if let Some(position) = load_pet_position(&handle) {
+          let _ = pet.set_position(tauri::PhysicalPosition::new(position.x, position.y));
+        }
+        {
+          let save_handle = app.handle().clone();
+          pet.on_window_event(move |event| {
+            if let WindowEvent::Moved(position) = event {
+              save_pet_position(&save_handle, *position);
+            }
+          });
+        }
+      }
       thread::spawn(move || {
         match start_backend(&handle) {
           Ok((child, port)) => {
@@ -86,6 +139,14 @@ pub fn run() {
             let url = format!("http://127.0.0.1:{port}").parse::<Url>();
             if let Ok(url) = url {
               let _ = window.navigate(url);
+            }
+            // The pet window loads the standalone pet page served by the same
+            // backend (same origin: BroadcastChannel carries the activity).
+            let pet_url = format!("http://127.0.0.1:{port}/pet.html").parse::<Url>();
+            if let Ok(pet_url) = pet_url {
+              if let Some(pet) = handle.get_webview_window("pet") {
+                let _ = pet.navigate(pet_url);
+              }
             }
           }
           Err(error) => {
@@ -110,8 +171,33 @@ pub fn run() {
     });
 }
 
-fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {
-  let root = resolve_bundle_root(app).ok_or_else(|| {
+/// Show, hide, or toggle the desktop pet window. Called from the web client
+/// (settings switch, pet context menu); the pet window is created hidden and
+/// this command is the only gate for its visibility.
+#[tauri::command]
+fn pet_control(app: AppHandle, action: String) {
+  let Some(window) = app.get_webview_window("pet") else { return };
+  match action.as_str() {
+    "show" => {
+      let _ = window.show();
+      let _ = window.set_focus();
+    }
+    "hide" => {
+      let _ = window.hide();
+    }
+    "toggle" => {
+      let visible = window.is_visible().unwrap_or(false);
+      if visible {
+        let _ = window.hide();
+      } else {
+        let _ = window.show();
+      }
+    }
+    _ => {}
+  }
+}
+
+fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {  let root = resolve_bundle_root(app).ok_or_else(|| {
     "desktop bundle not found; run pnpm run build from apps/desktop first".to_string()
   })?;
   let node = root.join("node").join("node.exe");

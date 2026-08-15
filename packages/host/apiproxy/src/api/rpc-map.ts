@@ -13,6 +13,7 @@ import type { GoalsApi } from './goals.ts'
 import type { SettingsApi } from './settings.ts'
 import type { CredentialsApi } from './credentials.ts'
 import type { LlmApi } from './llm.ts'
+import type { VisionApi } from './vision.ts'
 import type { PluginMarketApi } from './plugin-market.ts'
 import type { SubagentsApi } from './subagents.ts'
 import type { RpcResponse } from './rpc.ts'
@@ -84,6 +85,9 @@ export interface RpcMethodMap {
   'llm.providers': LlmApi['providers']
   'llm.models': LlmApi['models']
   'llm.discoverModels': LlmApi['discoverModels']
+  'vision.status': VisionApi['status']
+  'vision.test': VisionApi['test']
+  'vision.enable': VisionApi['enable']
 }
 
 /** Business request payload of method K (reaches through the RpcRequest narrow form to payload). */

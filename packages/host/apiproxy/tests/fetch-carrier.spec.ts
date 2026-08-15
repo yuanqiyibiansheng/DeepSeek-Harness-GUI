@@ -303,6 +303,17 @@ function fakeApi(overrides: Partial<{ muxFrames: MuxFrame[]; hostFrames: HostFra
         return { rpcId: request.rpcId, result: { ok: true, value: { models: [] } } }
       },
     },
+    vision: {
+      async status(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { enabled: false, configured: false, model: 'qwen3.8-max', apiKeyUrl: 'https://help.aliyun.com/zh/model-studio/get-api-key' } } }
+      },
+      async test(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { model: 'qwen3.8-max', description: 'stub' } } }
+      },
+      async enable(request) {
+        return { rpcId: request.rpcId, result: { ok: true, value: { model: 'qwen3.8-max', description: 'stub' } } }
+      },
+    },
     events: {
       mux: (_request, signal) => stream(muxFrames, signal),
       host: (_request, signal) => stream(hostFrames, signal),

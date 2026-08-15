@@ -81,6 +81,12 @@ describe('manifest round-trip', () => {
     expect(() => readProfileManifest('t', dir)).toThrow('must hold a JSON object')
     expect(() => readProfileManifest('t', join(dir, 'nope'))).toThrow('failed to read profile manifest')
   })
+
+  it('tolerates a UTF-8 BOM prefix (Windows editors commonly write one)', () => {
+    const dir = tmp()
+    writeFileSync(join(dir, 'package.json'), '\uFEFF' + JSON.stringify({ name: 'p', dsh: { profile: { bundles: ['a'] } } }))
+    expect(readProfileManifest('t', dir).dsh?.profile?.bundles).toEqual(['a'])
+  })
 })
 
 describe('resolveBundleDir', () => {

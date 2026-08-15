@@ -271,7 +271,7 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
   const profilesDir = join(home, PROFILES_DIR)
   const modulesDir = join(profilesDir, 'node_modules')
   mkdirSync(modulesDir, { recursive: true })
-  const appManifest = JSON.parse(readFileSync(installAnchor, 'utf8')) as ProfileManifest
+  const appManifest = readJsonFile<ProfileManifest>(installAnchor)
   const links = new Map<string, string>()
   /* v8 ignore next -- a real app manifest always declares its name */
   if (appManifest.name !== undefined) links.set(appManifest.name, dirname(installAnchor))
@@ -291,7 +291,7 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
       if (dir === undefined) continue
       links.set(dep, dir)
       const manifestPath = join(dir, 'package.json')
-      queue.push({ anchor: manifestPath, manifest: JSON.parse(readFileSync(manifestPath, 'utf8')) as ProfileManifest })
+      queue.push({ anchor: manifestPath, manifest: readJsonFile<ProfileManifest>(manifestPath) })
     }
   }
   for (const [packageName, target] of links) {
@@ -302,6 +302,18 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
 }
 
 /**
+ * Read and parse one JSON file, tolerating a UTF-8 BOM prefix: Windows
+ * editors and tools commonly write one, and JSON.parse rejects it, which
+ * would otherwise fail every profile/bundle manifest read loudly.
+ * @param path - JSON file to read.
+ * @returns the parsed value.
+ */
+function readJsonFile<T>(path: string): T {
+  const raw = readFileSync(path, 'utf8')
+  return JSON.parse(raw.replace(/^\uFEFF/, '')) as T
+}
+
+/**
  * Read a profile's manifest.
  * @param binName - the diagnostic prefix on the thrown error.
  * @param dir - the profile directory.
@@ -309,14 +321,13 @@ export function healProfilesModuleFallback(installAnchor: string, home: string =
  */
 export function readProfileManifest(binName: string, dir: string): ProfileManifest {
   const path = join(dir, 'package.json')
-  let raw: string
+  let parsed: ProfileManifest | null
   try {
-    raw = readFileSync(path, 'utf8')
+    parsed = readJsonFile<ProfileManifest | null>(path)
   } catch (error) {
     throw new Error(`${binName}: failed to read profile manifest ${path}: ${String(error)}`)
   }
   // The field checks below validate the file data before trusting the parse type.
-  const parsed = JSON.parse(raw) as ProfileManifest | null
   if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error(`${binName}: profile manifest ${path} must hold a JSON object`)
   }
@@ -432,16 +443,21 @@ export function loadProfile(
   const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
   // A hand-written profile manifest may omit the dsh section entirely.
   const bundles = manifest.dsh?.profile?.bundles ?? []
-  const layers = bundles.map((packageName): ProfileLayer => {
-    const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
-    const bundleManifest = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')) as ProfileManifest
-    const declared = bundleManifest.dsh?.bundle?.patch
-    if (declared === undefined) {
-      throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
+  const layers: ProfileLayer[] = []
+  for (const packageName of bundles) {
+    try {
+      const packageDir = resolveBundleDir(binName, packageName, installAnchor, dir)
+      const bundleManifest = readJsonFile<ProfileManifest>(join(packageDir, 'package.json'))
+      const declared = bundleManifest.dsh?.bundle?.patch
+      if (declared === undefined) {
+        throw new Error(`${binName}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
+      }
+      const patchPath = join(packageDir, declared)
+      layers.push({ packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) })
+    } catch (error) {
+      process.stderr.write(`${binName}: warning: skipping unresolved profile bundle ${JSON.stringify(packageName)}: ${error instanceof Error ? error.message : String(error)}\n`)
     }
-    const patchPath = join(packageDir, declared)
-    return { packageName, packageDir, patchPath, patches: loadOverlayPatches(binName, patchPath) }
-  })
+  }
   const patchPath = join(dir, PROFILE_PATCH_FILENAME)
   const patches = options.userLayer !== false && existsSync(patchPath)
     ? loadOverlayPatches(binName, patchPath)
