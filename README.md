@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Restore Agent preset descriptions in settings
+
+- Goal: the Agent preset management page stopped showing each preset's description and id because the dialog edit removed the card body render; the CSS and tests for the description were still present.
+- Files: packages/client/ui-agent-preset/src/client/AgentPresetSection.tsx (restored `CardDescription` and the card id row), README.md, README.zh.md.
+- Changes: every preset card now renders its localized/custom description (falling back to "No description."), a hover tooltip with the full text when the card clamps it, and the preset id; the newer Creator-mode entry and other dialog edits are kept. The desktop bundle and custom installer were rebuilt from source.
+- Impact: Settings shows the full preset descriptions again; the new-session chip still shows names only.
+- Notes: reinstall the rebuilt installer to see the restored descriptions.
+
 ### WebView boot-manifest cache fix for rebuilt client bundles
 
 - Goal: after the Agent preset dialog and client bundles were rebuilt, the client showed `Failed to load plugins` because the WebView served a cached `index.html` while the bundles had changed; the stale boot manifest missed `@deepseek-ai/dsh-client-runtime`, so `ui-theme` could not resolve `dsh-client-runtime/client`.
