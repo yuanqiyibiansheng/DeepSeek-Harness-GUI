@@ -12,9 +12,10 @@ const payloadZip = join(installerDir, 'src-tauri', 'payload.zip')
 const sourceExe = join(desktopDir, 'src-tauri', 'target', 'release', 'dsh-desktop.exe')
 const sourceNode = join(desktopDir, 'bundle', 'node')
 const sourceDsh = join(desktopDir, 'bundle', 'dsh')
+const sourceNpm = join(desktopDir, 'bundle', 'npm')
 const sourceSkills = join(installerDir, 'skills-seed')
-if (!existsSync(sourceExe) || !existsSync(sourceNode) || !existsSync(sourceDsh)) {
-  throw new Error('dsh desktop build missing; run apps/desktop tauri build first')
+if (!existsSync(sourceExe) || !existsSync(sourceNode) || !existsSync(sourceDsh) || !existsSync(sourceNpm)) {
+  throw new Error('dsh desktop build missing; run apps/desktop tauri build first (prepare:bundle must have bundled npm)')
 }
 if (!existsSync(sourceSkills)) {
   throw new Error('skills seed missing; run scripts/rewrite-skill-frontmatter.mjs first')
@@ -26,6 +27,7 @@ mkdirSync(join(stagingDir, 'resources'), { recursive: true })
 cpSync(sourceExe, join(stagingDir, 'DeepSeek Harness.exe'), { force: true })
 cpSync(sourceNode, join(stagingDir, 'resources', 'node'), { recursive: true, force: true })
 cpSync(sourceDsh, join(stagingDir, 'resources', 'dsh'), { recursive: true, force: true })
+cpSync(sourceNpm, join(stagingDir, 'resources', 'npm'), { recursive: true, force: true })
 cpSync(sourceSkills, join(stagingDir, 'resources', 'skills'), { recursive: true, force: true })
 
 if (existsSync(payloadZip)) rmSync(payloadZip, { force: true })

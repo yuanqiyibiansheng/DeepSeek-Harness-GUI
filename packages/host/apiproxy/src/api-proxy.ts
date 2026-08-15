@@ -45,6 +45,7 @@ import type {
   QueuedInboxItem, SessionSummary, SettingsNamespaceView, SubagentAddress, JobView, ToolEventView,
   WorkspaceId, WorkspaceView, PluginInstalledEntry, PluginMarketEntry,
 } from './api/index.ts'
+import type { VisionEnhancementRuntime } from './vision-enhancement.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
   flushLiveSessionLog,
@@ -133,7 +134,7 @@ const DEFAULT_MAX_MESSAGES = 50
  * composition-layer patch.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'web-search-deepseek', 'describe-image', 'terminal',
+  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'ui-pet', 'vision-enhancement', 'web-search-deepseek', 'describe-image', 'terminal',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */
@@ -660,6 +661,8 @@ export interface ApiProxyDefaults {
   saveDefaultModelSelection?: (selection: ModelSelection) => Promise<void>
   /** Default project directory for new sessions whose create request carries no cwd. */
   cwd: string
+  /** Optional Bailian vision-enhancement runtime (image understanding bridge). */
+  visionEnhancement?: VisionEnhancementRuntime
   /** Native open-with-default-application; injectable for carrier tests. */
   openPath?: (path: string, signal: AbortSignal) => Promise<void>
   /** Native text-editor handoff; injectable for settings-document tests. */
@@ -2578,7 +2581,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
               .some(message => contentHasImage(message.content))
             if (pendingImage || messagesHaveImage(found.agent.session.deriveMessages())) {
               const info = await ctx.llm.resolveModelInfo(resolved.provider, resolved.model)
-              if (info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
+              if (!defaults.visionEnhancement?.isEnabled()
+                && info.inputModalities !== undefined && !info.inputModalities.includes('image')) {
                 return err(request, {
                   code: 'model-unavailable',
                   message: `Model "${resolved.model}" does not accept image input, but this session already contains images; select an image-capable model.`,
@@ -2767,7 +2771,8 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             if (hasImage) {
               const current = selectionFor(agent).current
               const modelInfo = await ctx.llm.resolveModelInfo(current.provider, current.model)
-              if (modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
+              if (!defaults.visionEnhancement?.isEnabled()
+                && modelInfo.inputModalities !== undefined && !modelInfo.inputModalities.includes('image')) {
                 return err(request, {
                   code: 'attachment-error',
                   message: `Model "${current.model}" does not support image input.`,
@@ -3600,6 +3605,45 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           return ok(request, { removed: true })
         } catch (error: unknown) {
           return err(request, { code: 'internal', message: `skill removal failed: ${String(error)}`, details: {} })
+        }
+      },
+    },
+
+    vision: {
+      async status(request) {
+        if (defaults.visionEnhancement === undefined) {
+          return err(request, { code: 'internal', message: '视觉能力增强服务未安装。', details: {} })
+        }
+        return ok(request, await defaults.visionEnhancement.status())
+      },
+
+      async test(request, signal) {
+        if (defaults.visionEnhancement === undefined) {
+          return err(request, { code: 'internal', message: '视觉能力增强服务未安装。', details: {} })
+        }
+        try {
+          return ok(request, await defaults.visionEnhancement.test(request.payload, signal))
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'internal',
+            message: error instanceof Error ? error.message : String(error),
+            details: {},
+          })
+        }
+      },
+
+      async enable(request, signal) {
+        if (defaults.visionEnhancement === undefined) {
+          return err(request, { code: 'internal', message: '视觉能力增强服务未安装。', details: {} })
+        }
+        try {
+          return ok(request, await defaults.visionEnhancement.enable(request.payload, signal))
+        } catch (error: unknown) {
+          return err(request, {
+            code: 'internal',
+            message: error instanceof Error ? error.message : String(error),
+            details: {},
+          })
         }
       },
     },

@@ -85,7 +85,7 @@ export function apply(ctx: Context, config: Config): void {
   const defaultTimeoutMs = config.defaultTimeoutMs ?? DEFAULT_HOOK_TIMEOUT_MS
   let parsed: CodexHookConfig = {}
   try {
-    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8'))
+    const raw: unknown = JSON.parse(readFileSync(config.configPath, 'utf8').replace(/^\uFEFF/, ''))
     const result = parseCodexConfig(raw)
     parsed = result.config
     for (const s of result.skipped) {

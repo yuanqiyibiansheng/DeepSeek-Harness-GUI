@@ -94,6 +94,12 @@ export default defineConfig({
   build: {
     sourcemap: true,
     rollupOptions: {
+      input: {
+        // Main shell plus the standalone pet-window page (transparent desktop
+        // window; both served by the same backend origin).
+        main: src('./index.html'),
+        pet: src('./pet.html'),
+      },
       output: {
         // Output layout: the two main chunks stay at assets/ root; lazy
         // @shikijs/langs grammar chunks group under assets/langs/; fonts

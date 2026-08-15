@@ -1,143 +1,349 @@
-# DeepSeek Harness GUI
+# DeepSeek Harness
 
-![logo](assets/logo/dspk.png)
+English | [中文](README.zh.md)
 
-基于 DeepSeek Harness 二次创作的 Windows 桌面客户端。保留上游 Agent Harness 的完整能力，额外提供桌面壳、代码审阅、对话回滚、插件市场、人格设定、技能管理、供应商一键导入、中文命令面板与自定义安装器。
+DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
 
-本项目属于二创：核心运行时来自 DeepSeek Harness，桌面壳与安装器为本地改造，功能参考了多个开源项目，具体来源见文末「功能来源」。
+It uses an architecture where **everything is a plugin**, and is powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper).
 
-## 主要功能
+## Developer preview
 
-### 桌面客户端
-- Tauri 2 桌面壳，启动时自动拉起本地 `dsh web` 后端
-- 侧边栏、对话区、设置页、详情面板完整适配桌面窗口
-- 自定义安装器 `dsh-desktop-installer.exe`，内置最新桌面程序和运行资源，不依赖 NSIS
+DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
 
-### 代码审阅
-- 会话头部按钮或 `Ctrl+Alt+B` 打开右侧代码审阅抽屉
-- 显示当前工作区的 git 变更列表、新增文件、stat 与 diff
-- 本地服务提供变更快照与长轮询更新
+## Run
 
-### 对话回滚
-- 每条用户自己发起的消息旁都有回滚按钮
-- 点击哪条消息就精准回滚到该消息发出前的文件状态
-- 会话日志按文件字节偏移截断，不再复制正在写入的日志，避免会话日志损坏
-- 历史记录写入项目目录 `.recode/history.db`，完全本地，不需要服务器
+### Run from `npm`
 
-### 插件市场
-- 设置页「插件」分区提供「插件市场」标签页
-- ComfyUI Manager 风格：搜索、安装、卸载、更新全部
-- 底层通过 `dsh plugin` 管理 web profile 插件
-
-### 人格设定
-- 设置页提供「人格设定」页面
-- 直接编辑用户级 `~/.dsh/AGENTS.md`，全局指令注入每个会话
-
-### 技能管理
-- 设置页提供「技能」页面
-- 列出用户级技能，支持模型调用开关、用户调用开关与删除
-
-### 供应商一键导入
-- 模型设置内置一键供应商预设
-- 支持 OpenAI、Anthropic、Google Gemini、Groq、OpenRouter、Kimi、MiniMax、Ollama、OpenAI 兼容中转站
-
-### 中文命令面板
-- `/compact` 压缩较旧的对话历史
-- `/feedback` 记录本次会话的反馈
-- `/goal` 设置或查看长期任务的目标
-- `/permission` 切换权限预设（沙箱模式 + 审批策略）
-- `/plan` 进入或退出规划模式
-- `/export` 导出本次会话日志为 ZIP 压缩包
-- `/model` 选择本会话使用的模型
-
-### 其他修复
-- 侧边栏按钮 Tooltip 气泡改为挂载到 `document.body` 并使用顶层 z-index，不再被侧边栏或面板遮挡
-- 移除透明面板问题，详情面板保持不透明显示
-- 移除主页侧边栏底部的重复「插件市场」入口，插件市场仅保留在设置页
-
-## 项目结构
-
-```
-apps/desktop/                    Tauri 桌面壳与本地 diff/回滚服务
-  src-tauri/src/diff_server.rs   代码审阅、快照、回滚、本地 SQLite 历史
-  scripts/prepare-bundle.mjs     准备独立 dsh web 运行目录
-apps/desktop-installer/          自定义安装器源码（Vite + Tauri）
-  scripts/prepare-payload.mjs    打包 dsh-desktop.exe 与运行资源
-  uninstaller/                   卸载器源码
-packages/client/ui-sidebar-toggle/   代码审阅入口、回滚按钮、弹窗
-packages/client/ui-settings-persona/ 人格设定页面
-packages/client/ui-settings-skills/  技能管理页面
-packages/client/ui-settings-plugin-inventory/  插件市场页面（设置页入口）
-packages/client/ui-settings-models/  模型设置与供应商预设
-packages/client/connection/     客户端通信与 wire 接口
-packages/host/apiproxy/         宿主 API 网关、skills/pluginMarket/host 接口
-packages/bundle/web-app/        Web 插件注册
-```
-
-## 构建安装
-
-环境要求：
-
-- Node.js `^22.19` 或 `>=24`
-- pnpm
-- Windows（当前桌面壳与安装器面向 Windows）
+Install `Node.js`, then run:
 
 ```sh
+npx @deepseek-ai/dsh web
+```
+
+The command starts the Web UI, served at `http://127.0.0.1:3080` by default. See [Web UI guide](docs/user/guide/index.md).
+
+### Run from source
+
+To run from a repository checkout:
+
+```sh
+git clone https://github.com/deepseek-ai/deepseek-harness.git
+cd deepseek-harness
 pnpm install
 pnpm run build
+pnpm dsh web
 ```
 
-生成桌面主程序与独立运行目录（不使用 NSIS）：
+## Community and support
+
+- Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
+- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
+- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Desktop build
+
+An optional Tauri 2 shell packages the Web UI as a Windows desktop app:
 
 ```sh
-pnpm --filter @deepseek-ai/dsh-desktop run build:no-bundle
+build-desktop.bat
 ```
 
-生成自定义安装器：
+The script checks Node.js 22.19+ or 24+, installs dependencies, builds the workspace, prepares a self-contained `dsh web` runtime under `apps/desktop/bundle`, and runs `tauri build`. The NSIS installer is written to `apps/desktop/src-tauri/target/release/bundle/nsis/`.
 
-```sh
-pnpm --filter @deepseek-ai/dsh-desktop-installer run build:setup
-```
+The shell lives in `apps/desktop` and adapts the Tauri shell layout from [NexBox](https://github.com/MuLiuSaMa/NexBox) (GPL-3.0); application icons use the DeepSeek logo from `LOGO/DeepSeek256x256.ico`.
 
-输出位置：
+## Development
 
-- 桌面主程序：`apps/desktop/src-tauri/target/release/dsh-desktop.exe`
-- 独立运行目录：`apps/desktop/bundle`
-- 自定义安装器：`apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe`
-- 可选 NSIS 安装包：`apps/desktop/src-tauri/target/release/bundle/nsis/`
+Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
 
-## 功能来源
+For agents, follow [AGENTS.md](AGENTS.md).
 
-- 上游基础：DeepSeek Harness（MIT）  
-  https://github.com/deepseek-ai/deepseek-harness
+## License
 
-- 插件市场、人格设定、技能管理、供应商一键导入参考：SnowSalt  
-  https://github.com/KYZHXL/deepseek-harness-snowsalt
+[MIT](LICENSE)
 
-- 右侧面板与图像理解参考：dsh-web-ui  
-  https://github.com/zhu1090093659/dsh-web-ui  
-  说明：本仓库参考过 dsh-web-ui 的方案；最终发布版未内置右侧面板，鲸鱼娘宠物功能已移除，图像理解可作为外部插件单独安装。
+Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-本项目为二创项目，保留上游 LICENSE 与 THIRD_PARTY_NOTICES 中的署名要求。涉及 GPL-3.0 / Apache-2.0 / MIT 的部分均按各自许可证保留来源说明。
 
-## 数据目录
+## Recent changes
 
-桌面端默认使用：
+### Source rebuild of desktop bundle and installer
 
-```
-%APPDATA%\ai.deepseek.harness.desktop\dsh
-```
+- Goal: prevent the public-plugin startup failure from recurring and ship a fresh installer built from the latest source; also remove stale TypeScript compiler artifacts that had been emitted into `packages/*/*/src`.
+- Files: packages/boot/app-boot/src/profile.ts, packages/client/ui-plugin-marketplace/src/index.ts (already carry the broken-bundle tolerance and safer marketplace install flags), apps/desktop/bundle, apps/desktop/src-tauri/target/release/dsh-desktop.exe, apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe, README.md, README.zh.md.
+- Changes: the desktop shell and installer were rebuilt from source with the bundled Node 24 and pnpm 11.19 (`pnpm run build`, `dsh-desktop build:no-bundle`, `dsh-desktop-installer build:setup`). The installer payload was regenerated, and 306 stale `.js` / `.d.ts` / `.map` files under package `src` trees were removed so `src` stays pure TypeScript.
+- Impact: `dsh-desktop-installer.exe` now contains the marketplace/startup tolerance fix; source trees no longer confuse tsx by shadowing `.ts` files with compiled artifacts.
+- Notes: if an existing install still carries a broken web profile, clear `%APPDATA%\ai.deepseek.harness.desktop\dsh\profiles\web` before reinstalling; marketplace installs use `--legacy-peer-deps --install-strategy=hoisted`.
 
-- `profiles/web`：web profile 与已安装插件
-- `sessions`：会话数据
-- `storages`：存储数据
-- `settings.yaml`：用户设置
+### Public plugin tolerance and startup repair
 
-## 更新日志
+- Goal: after installing third-party marketplace plugins, the desktop app stuck on "Starting DeepSeek Harness..." and then refused connections to `127.0.0.1`; a broken external bundle in the web profile made the backend exit before the HTTP server bound.
+- Files: packages/boot/app-boot/src/profile.ts (loadProfile now logs a warning and skips unresolved profile bundles instead of aborting boot), packages/client/ui-plugin-marketplace/src/index.ts (marketplace installs now use `--legacy-peer-deps --install-strategy=hoisted`), README.md, README.zh.md.
+- Changes: the local web profile's broken `@deepseek-ai/dsh-mcp-client` and `@deepseek-ai/dsh-web-search-deepseek` dependencies (the latter required the missing `@deepseek-ai/dsh-environment`) were removed; the desktop bundle and the custom installer were rebuilt with the tolerance fix.
+- Impact: one broken plugin bundle no longer blocks startup; the failing bundle is skipped with a warning and the client can reach its local Web UI again. The existing desktop pet, vision enhancement, and terminal features are unchanged.
+- Notes: if an old profile still carries broken plugin state, clear `%APPDATA%\ai.deepseek.harness.desktop\dsh\profiles\web` before reinstalling; third-party plugins should still be installed in versions compatible with this client.
 
-### 2026-08-15
-- 修改目标：移除主页侧边栏底部重复的插件市场入口。
-- 修改文件：`packages/client/ui-settings-plugin-inventory/src/client/index.ts`、`PluginMarketAction.tsx`、`PluginMarketAction.module.css`、`locales.ts`、`tests/browser-plugin.client.spec.tsx`、`README.md`。
-- 修改内容：不再注册 `sidebar.footer.action` 插件市场按钮，删除该按钮组件与专用文案；设置页插件市场标签保持不变。
-- 影响范围：桌面客户端主页左下角不再显示插件市场按钮；设置页插件市场功能不受影响。
-- 注意事项：本次未改动插件市场 API 与安装卸载逻辑；重新构建桌面主程序与安装器后生效。
+### Marketplace auto-loads the catalog on tab open
+
+- Goal: the marketplace tab only showed results after pressing search, so first-time visitors saw just the installed list and thought the market was nearly empty.
+- Files: packages/client/ui-plugin-marketplace/src/client/MarketplaceTab.tsx (auto-run the default catalog search — empty query → `keywords:dsh-plugin` — on first mount; empty-state copy now also covers a no-result default search), README.md, README.zh.md.
+- Changes: opening Settings → Plugins → Marketplace immediately fetches and renders up to 250 dsh plugins from the npm registry; the search box still filters on demand.
+- Impact: the tab is never empty; ~700 dsh-plugin packages are discoverable at once.
+- Notes: searching still requires network access to the npm registry.
+
+### Marketplace discovery scale-up: npm registry search + bundled npm CLI
+
+- Goal: the marketplace tab only returned the npm CLI's default 25 search hits and could not install at all on machines without a Node/npm installation, so it looked empty compared with the reference plugin center. Discovery now uses the npm registry search API (250-hit page — the same discovery the studio plugin center uses), and the desktop bundle ships a full npm CLI beside the bundled node so install/uninstall work offline of a system Node.
+- Files: packages/client/ui-plugin-marketplace/src/index.ts (search via https://registry.npmjs.org/-/v1/search with 250/page instead of the npm CLI; install/uninstall still drive the bundled npm), apps/desktop/scripts/prepare-bundle.mjs (bundleNpm: `npm install --prefix bundle/npm npm@10` during bundle prep), apps/desktop-installer/scripts/prepare-payload.mjs (copy bundle/npm into the installer payload), apps/desktop/src-tauri/tauri.conf.json (bundle/npm resource), README.md, README.zh.md.
+- Changes: the npm public registry reports ~700 packages tagged dsh-plugin; the marketplace now lists up to 250 per search. The bundled npm (10.x, ~11MB) is found by the host half at `<bundle>/npm/node_modules/npm` and executed with the bundled node.
+- Impact: the Settings → Plugins "Marketplace" tab shows a rich dsh-plugin catalog and can install/uninstall on the desktop app without any system Node.
+- Notes: search still requires network access to the npm registry; install writes into the web profile and activates after a service restart.
+
+### Boot hardening: UTF-8 BOM tolerance for JSON manifest reads
+
+- Goal: the desktop client once hung at startup because the web profile's package.json carried a UTF-8 BOM (Windows editors write one) and referenced removed external plugins; JSON.parse rejects the BOM and the profile boot failed. The runtime state was repaired, and the code now tolerates BOMs so an editor-written manifest cannot stall the boot again.
+- Files: packages/boot/app-boot/src/profile.ts (new readJsonFile helper stripping a leading BOM; used by readProfileManifest, healProfilesModuleFallback, and profile-bundle reads), packages/client/modules/src/index.ts (package.json read), packages/client/ui-plugin-marketplace/src/index.ts (profile manifest read), packages/hooks/hooks-claude-code/src/index.ts + packages/hooks/hooks-codex/src/index.ts (hook config reads), packages/boot/app-boot/tests/profile.spec.ts (BOM tolerance test), README.md, README.zh.md.
+- Changes: every JSON manifest/config read now strips a UTF-8 BOM before parsing, so a BOM-bearing file parses identically to a clean one.
+- Impact: profiles, bundles, and hook configs written by Windows tools with a BOM load normally; startup no longer depends on the file's byte prefix.
+- Notes: the user's web profile no longer references @linxin666 plugins (dependencies and node_modules removed); the installer was rebuilt with the fix.
+
+### Vision enhancement (Bailian bridge) ported from deepseek-harness-studio; old image-understanding plugins removed
+
+- Goal: (1) port the studio project's vision enhancement into this project — a Bailian (DashScope) Qwen3.8 vision bridge that turns image blocks into model-visible observations for text-only agents, plus a `vision_analyze` tool, a General-settings row and a composer shortcut; (2) remove the previous image-understanding paths: the `@linxin666/dsh-tool-describe-image` tool and the `@linxin666/dsh-client-ui-web-ui-settings` webui settings card from the user's web profile.
+- Files: packages/host/apiproxy/src/vision-enhancement.ts (new — installVisionEnhancement: vision_analyze tool, llm/stream image→observation bridge, vision-enhancement settings namespace, Bailian credential ref), packages/host/apiproxy/src/api/vision.ts + api/vision.schema.ts (new — vision.status/test/enable contract), packages/host/apiproxy/src/api/{index.ts, rpc-map.ts} (vision domain), packages/host/apiproxy/src/index.ts (installVisionEnhancement + api.vision), packages/host/apiproxy/src/api-proxy.ts (vision handlers, WEB_SETTINGS_NAMESPACES + vision-enhancement, selectModel/prompt image-admission exemptions while enabled), packages/host/apiproxy/src/fetch/{client.ts, handler.ts} (vision wire schemas + routes), packages/host/apiproxy/tsconfig.json (fs/scope/system-prompt references), packages/client/ui-vision-enhancement (new — VisionEnhancementRow/Dialog/Shortcut/controller/css + apply registering settings.general.item + conversation.input.left), apps/web/public/dsh-desktop/default-background.webp (new — dialog verification image), packages/client/ui-plugin-marketplace (new — settings plugin marketplace tab, npm-driven host half, ported from EAC), packages/bundle/web-app (ui-vision-enhancement + ui-plugin-marketplace rows), tsconfig.client.json, README.md, README.zh.md.
+- Changes:
+  - While the vision-enhancement switch is on, the host rewrites image blocks in outgoing messages into `<vision_observation>` text from Bailian (`qwen3.8-max`) and logs them as durable `vision/observation` session events; the model image-admission checks are bypassed. The `vision_analyze` tool reads workspace images. The settings row and composer shortcut share one controller (status/enable/disable) and a guided dialog that verifies a real image with the API key before enabling.
+  - The user's web profile no longer depends on `@linxin666/dsh-tool-describe-image` and `@linxin666/dsh-client-ui-web-ui-settings` (dependencies + node_modules removed).
+  - The marketplace tab (search/install/uninstall dsh plugins from npm into the web profile) is registered under Settings → Plugins; its host half needs a bundled npm CLI in the desktop bundle (pending packaging).
+- Impact: text-only DeepSeek agents can read screenshots, photos, charts, and image text via Bailian; enable it in Settings → General → 视觉能力增强 or the composer shortcut (needs a DASHSCOPE_API_KEY).
+- Notes: the vision bridge only activates after a successful image verification; API keys are stored in the local credential store.
+
+### Pet exits with the client (main window close)
+
+- Goal: closing the client left the pet window running on the desktop, because the app stayed alive while any window (the pet) remained open.
+- Files: apps/desktop/src-tauri/src/lib.rs (close the pet window when the main window receives CloseRequested).
+- Changes: the main window's CloseRequested handler now closes the pet window too, so the app exits with the client.
+- Impact: closing the client closes the desktop pet; the pet's last screen position is still persisted on the way out.
+- Notes: hiding just the pet (without quitting) stays on the settings switch.
+
+### Pet drag fix (deep drag region)
+
+- Goal: the pet window showed and the switch worked, but the pet could not be dragged. Tauri's drag-region script treats a bare `data-tauri-drag-region` attribute as self-only (a click must land on the element itself); clicks on the fish (a child element) walked up to the region and were rejected.
+- Files: apps/web/src/pet/main.tsx (data-tauri-drag-region="deep").
+- Changes: the pet window's drag region is now `deep`, so a press anywhere in the window (fish included) starts the window drag; the hide-menu button stays clickable (clickable elements without the attribute still block drag).
+- Impact: the desktop pet can be dragged to any screen position again; the position keeps persisting via pet-position.json.
+- Notes: right-click still opens the hide menu; the menu button does not start a drag.
+
+### Pet fixes: settings namespace exposure + remote-origin command ACL
+
+- Goal: after installing the transparent-window build, the pet window never appeared and the settings switch was dead. Two independent root causes: (1) the `ui-pet` settings namespace was not in the web configuration client whitelist, so every switch write answered `settings-not-exposed` and the switch stayed stuck; (2) Tauri denied the `pet_control` app command on the remote http://127.0.0.1 origins (main + pet windows) because no app ACL manifest existed and no capability granted the command.
+- Files: packages/host/apiproxy/src/api-proxy.ts (add `ui-pet` to WEB_SETTINGS_NAMESPACES), apps/desktop/src-tauri/build.rs (app_manifest commands `pet_control` so tauri-build autogenerates the app ACL), apps/desktop/src-tauri/capabilities/default.json + pet.json (grant `allow-pet-control` alongside the remote URLs), README.md, README.zh.md.
+- Changes: switch writes now reach the persisted `ui-pet.enabled` document; the pet window's show/hide/toggle command is granted to both windows' remote origins, so the plugin's settings sync can show the window and the right-click hide works.
+- Impact: the pet switch toggles the desktop pet window and the choice persists; the pet appears on the desktop when enabled.
+- Notes: verified by local reproduction (switch click → settings.mutate answered `settings-not-exposed` before the fix) and by the generated ACL (`allow-pet-control` present, capabilities validate at build).
+
+### Desktop pet as a separate transparent window; settings switch; right-click menu; message layout fix
+
+- Goal: (1) move the pet out of the main window into its own transparent always-on-top desktop window (a real desktop pet: drag it anywhere, it stays when the main window is minimized), (2) add a General-settings switch for the pet whose state is remembered across restarts, (3) replace the old instant right-click hide with a right-click menu (hide), (4) restore the per-message rollback button to the right-side action strip of user messages (it had been floating on the left of each message).
+- Files: apps/desktop/src-tauri/tauri.conf.json (pet window: transparent, decorations off, always on top, skip taskbar, hidden until the switch says show; capability `remote` URLs for main+pet so the http://127.0.0.1 backend pages can reach IPC), apps/desktop/src-tauri/capabilities/pet.json (new — drag-region permission for the pet window), apps/desktop/src-tauri/capabilities/default.json (remote URLs for the main window), apps/desktop/src-tauri/src/lib.rs (navigate the pet window to `pet.html` once the backend is up, persist/restore its screen position in pet-position.json, `pet_control` command: show/hide/toggle), apps/web/pet.html (new — standalone pet page entry), apps/web/src/pet/{main.tsx, pet-page.module.css, vendor/*} (new — pet stage: BroadcastChannel listener, drag region, hover jump / click wave, right-click hide menu; renderer sources vendored from ui-pet), apps/web/src/css-modules.d.ts (new), apps/web/vite.config.ts (multi-entry: main + pet), packages/client/ui-pet/src/index.ts (register the `ui-pet` settings namespace), packages/client/ui-pet/src/pet-settings.ts (new — namespace/schema), packages/client/ui-pet/src/client/index.ts (forward `session/activity` over BroadcastChannel `dsh:pet-activity`; bind the settings scope and drive `pet_control`; register the General-section toggle row), packages/client/ui-pet/src/client/{PetToggleRow.tsx, PetToggleRow.module.css, pet-toggle-store.ts, locales.ts} (new), packages/client/ui-pet/src/client/PetDock.tsx (removed — replaced by the standalone window), packages/client/ui-pet/tests (apply.client.spec.ts, pet-toggle-row.client.spec.tsx replacing pet-dock.client.spec.tsx), packages/client/ui-conversation/src/client/chat/MessageItem.module.css (drop the anchor `position: relative`), packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css (undo button back in the actions strip), tsconfig.base.json (explicit `@deepseek-ai/dsh-client-ui-settings/client` paths entry), README.md, README.zh.md.
+- Changes:
+  - The pet window loads the same-origin `pet.html` served by the dsh web backend; activity flows from the main window's ui-pet plugin to the pet window over a same-origin BroadcastChannel (no cross-window IPC), the window is draggable anywhere (Tauri drag region), right-click opens a hide menu, and the screen position is persisted in `pet-position.json`.
+  - The General settings section now shows a 桌宠 switch (ui-pet namespace). The choice is persisted; on startup the plugin mirrors it to the shell (`pet_control show/hide`), so the last state survives restarts. In a plain browser (no desktop shell) the switch is inert.
+  - The rollback button returns to the message actions strip (right side); user message bubbles stay right-aligned.
+  - An environment fix along the way: a stale `tsc -b` run had emitted `.js`/`.d.ts` files into `packages/*/src/` (vite prefers `.js` over `.ts`, so tests silently loaded built artifacts and crashed on the browser-module-loader globals); the polluted files were removed and the ui-pet tsconfig references were completed so `tsc -b` emits only under `lib/types` again.
+- Impact: the DeepSeek 大肥鱼 lives in its own desktop window, animated by the agent state (修改代码/思考中/空闲), draggable with remembered position; the settings switch controls it with persistence; right-click no longer makes it vanish without a trace.
+- Notes: the pet window is created hidden and only becomes visible when the switch is on; the switch is the recovery entry after hiding the pet. Pet window size is fixed at 240x260.
+
+### Desktop pet plugin activation fix (inject: ['runtime'] removed)
+
+- Goal: fix the web boot failure `1 entry did not activate @deepseek-ai/dsh-client-ui-pet: pending (waiting for service: runtime)`. The client plugin declared `inject: ['runtime']`, but dsh-client-runtime provides no `runtime` service (it provides `slots`, `sessions`, `workspaces`); the plugin therefore waited forever and the pet never appeared.
+- Files: packages/client/ui-pet/src/client/index.ts.
+- Changes: the plugin's `inject` is now `[]`. It only listens on the shared context's `session/activity` event (emitted by dsh-client-runtime per mux envelope), which needs no service injection; activation is no longer gated on a nonexistent service.
+- Impact: the DeepSeek 大肥鱼 pet loads on web boot again and animates with the agent state (修改代码/思考中/空闲), draggable with persisted position, right-click hides.
+- Notes: `dsh.client.inject` in packages/client/ui-pet/package.json stays as the informational package-dependency edge (`@deepseek-ai/dsh-client-runtime`); it does not sequence activation.
+
+### Desktop pet (DeepSeek fat-fish, in-window floating); old pets removed
+
+- Goal: replace the third-party in-page pet (`@linxin666/dsh-pet`, removed from the web profile) with a free local floating companion inside the main window, using the DeepSeek 大肥鱼 spritesheet (from the deepseek-fat-fish-codex-pet fan project). The pet shows the agent's live state — tool executing (working), step thinking, or idle — with distinct animations, is draggable with persisted position, and hides on right-click for the session. (An earlier separate transparent window approach was abandoned: the pet now lives in the page.)
+- Files: packages/client/ui-pet (new — package.json, tsconfig.json, tsdown.config.ts, src/index.ts, src/invariant.ts, src/client/{index.ts, PetDock.tsx, PetRenderer.tsx, petAnimation.ts, petTypes.ts, builtinPets.ts, pet.module.css, css-modules.d.ts}, tests/pet-dock.client.spec.tsx), packages/client/runtime/src/client/index.ts (session/activity event: derives working/thinking/idle from mux session events), packages/bundle/web-app/cordis.patch.yml + package.json (ui-pet row), tsconfig.client.json (ui-pet reference), apps/web/public/pets/deepseek-fat-fish.webp (served by the frontend-static fallback), README.md, README.zh.md.
+- Changes:
+  - `@deepseek-ai/dsh-client-ui-pet` mounts a global floating pet onto `document.body` (single React root, no session dimension). The dock listens for the runtime's `session/activity` events, mapped to the fat-fish animations: working → running, thinking → waiting, idle → idle; hovering plays jumping, clicking waves, dragging moves the pet and persists the position to localStorage, right-click hides it for the session.
+  - The runtime (`packages/client/runtime/src/client/index.ts`) now emits `session/activity` per mux session event: `tool/call` → working, `step/start`/`turn/start`/`assistant/message` → thinking, `tool/result`/`turn/end` → idle. One event, no second connection.
+  - The fat-fish spritesheet ships in `apps/web/public/pets/` (vite copies it into dist; the frontend-static fallback serves it verbatim) and is referenced by URL — tsdown cannot bundle image assets.
+  - The old `@linxin666/dsh-pet` package, its bundle row, and `pet.json` were removed from the user web profile; the earlier cc-haha built-in pets were dropped in favor of the single fat-fish pet.
+- Impact: a free local DeepSeek 大肥鱼 pet floats at the bottom-left of the GUI and animates with the agent's state (修改代码/思考中/空闲); it never leaves the machine and requires no account or payment.
+- Notes: pet size is fixed at 140; pet settings are not wired into the GUI settings page yet.
+
+### Chinese permission presets, remembered window size, centered launch, review fetch retry
+
+- Goal: (1) localize the permission preset labels (Read Only / Workspace Write / Full access) into Chinese, (2) remember the main window size across launches, (3) center the window on launch, (4) stop the code-review drawer's first-open "Failed to fetch".
+- Files: packages/client/ui-permission-presets/src/client/presentation.ts, packages/client/ui-permission-presets/src/client/locales.ts, packages/client/ui-permission-presets/tests (3 spec files), packages/client/ui-permission-presets/package.json, apps/desktop/src-tauri/src/lib.rs, apps/desktop/src-tauri/src/diff_server.rs, apps/desktop/src-tauri/tauri.conf.json, packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.tsx, README.md, README.zh.md.
+- Changes:
+  - Preset labels now come from a Chinese map in `presentation.ts`: 只读 / 工作区写入 / 完全访问; the Full-access confirmation copy in the zh dictionaries follows (完全访问). Custom host-configured preset names still pass through unchanged.
+  - The desktop shell persists the main window size to `window-size.json` in the app data dir on every resize (`on_window_event(Resized)`), restores it at startup, then centers the window (`center: true` in tauri.conf.json plus an explicit `restore_and_center`).
+  - The diff server now retries binding port 3199 (200 ms interval) instead of dying silently when the previous instance's socket is still closing, so the review drawer's first fetch finds the server; the client-side load retry was raised from 3 to 5 rounds (800 ms apart).
+  - The PermissionRow component spec was rewritten to mount via `react-dom/client` createRoot (the `@testing-library/react` mount crashes on the repo-wide react 19/18 mix) and now asserts the Chinese labels.
+- Impact: the permission dropdown is fully Chinese, the window keeps its size and launches centered, and the code-review drawer no longer errors on first open.
+- Notes: rebuild the desktop bundle and installer for the shell changes to ship.
+
+### Bundled user skills seeded by the installer (Chinese descriptions)
+
+- Goal: make the GUI's Skills settings page show a usable built-in skill set. The user had Trae IDE skills at `~/.trae-cn/skills`; the usable subset (Anthropic/Vercel originals and generic dev skills) is now shipped inside the desktop installer and seeded into the user skills root on install, with Chinese single-line descriptions.
+- Files: apps/desktop-installer/skills-seed (27 skill directories, SKILL.md frontmatter rewritten), apps/desktop-installer/scripts/prepare-payload.mjs, apps/desktop-installer/scripts/rewrite-skill-frontmatter.mjs (new), apps/desktop-installer/skills-zh-desc.json (new), apps/desktop-installer/src-tauri/src/installer.rs, README.md, README.zh.md.
+- Changes:
+  - `prepare-payload.mjs` now also copies `skills-seed/` into the payload as `resources/skills/`, so every installer carries the skill set.
+  - `installer.rs` gained `seed_user_skills` (plus `copy_dir_all`): after payload extraction the bundled skills are copied to `%APPDATA%\ai.deepseek.harness.desktop\dsh\skills` (the DSH_HOME root the Skills settings page reads). Existing skill directories are never overwritten, so user edits and additions survive reinstalls.
+  - `rewrite-skill-frontmatter.mjs` + `skills-zh-desc.json`: each seeded SKILL.md frontmatter gets `name` matching its directory (kebab-case, e.g. `vercel-composition-patterns` → `composition-patterns`) and a single-line Chinese `description` — the web management parser reads only `key: value` lines, so folded multi-line descriptions would render empty.
+  - Excluded sources: ByteDance-internal skills (douyin-*, douyinpay, byted-bp, iga-pages, hook/report video tooling), Intel AIPC `local-*` hardware skills, and account-dependent ones (alipay, figma MCP, Notion research, 天眼一下 tyc OAuth).
+- Impact: a fresh install shows 27 Chinese-described skills in Settings → Skills, each toggleable (model/user) and removable; the current machine's `%APPDATA%\...\dsh\skills` was seeded immediately too.
+- Notes: rebuild the installer for the seeding to ship; the seed directory lives in the installer workspace and is not part of the dsh bundle.
+
+### Terminal shell dropdown: popup width and toggle fixes
+
+- Goal: the "Integrated Terminal Shell" dropdown popup was wider than its trigger (the in-place list kept the 218px card min-width) and could not be closed by clicking the trigger again.
+- Files: packages/client/ui-terminal/src/client/TerminalShellRow.tsx, packages/client/ui-terminal/tests/TerminalShellRow.client.spec.tsx, README.md, README.zh.md.
+- Changes:
+  - `TerminalShellRow`'s `Menu` now opts into `portal` (as the permission-preset and the other settings rows do), so the popup is fixed-positioned and sized to the trigger's width (NexBox-style) instead of the 218px in-place card minimum.
+  - The trigger click toggles `open` instead of only opening, so clicking the trigger again closes the menu; outside click and Escape still close it.
+  - Added a spec asserting the trigger-toggle close behavior.
+- Impact: the shell picker matches the other settings dropdowns in width and interaction.
+- Notes: rebuild the desktop bundle/installer for the GUI to pick up the fix.
+
+### Terminal panel removed; shell picker kept; dropdowns match NexBox style
+
+- Goal: remove the user-facing integrated terminal panel (sidebar footer action + xterm panel) — the terminal is for the agent, not the user; keep only the "Integrated Terminal Shell" settings row, and make every dropdown match the NexBox `CustomSelect` look (popup as wide as the trigger, chevron rotate, hover transitions).
+- Files: packages/client/ui-terminal (src/client/index.ts, src/client/locales.ts, src/client/terminal-model.ts, src/client/TerminalShellRow.tsx, package.json, tsconfig.json, README.md, README.zh.md; deleted src/client/SidebarTerminalAction.tsx, src/client/TerminalPanel.tsx, src/client/TerminalAction.module.css, src/client/TerminalPanel.module.css, tests/terminal-model.client.spec.ts), packages/client/ui-primitives/src/Menu.tsx + Menu.module.css, packages/bundle/web-app/cordis.patch.yml, README.md, README.zh.md.
+- Changes:
+  - `ui-terminal` now registers only the `settings.general.item` row (`terminal-shell`); the `sidebar.footer.action` registration, the panel, the xterm dependencies, and the SSE `parseSseFrames` helper are gone. The `terminal` settings namespace (host-owned) still drives `dsh-pwsh-local`'s executing shell, so the agent runs commands in the shell chosen in settings.
+  - Locale keys pruned to the two used by the row (`terminal.shellSetting`, `terminal.shellSettingDesc`).
+  - `Menu` portal mode now sizes the popup to the anchor trigger's width (`width: r.width`) and the portal list drops its minimum width, matching the NexBox `CustomSelect`; the shell row's chevron rotates 180deg while open with the same transition.
+  - Dependency hygiene: `ui-terminal` dropped `@deepseek-ai/dsh-client-ui-sidebar` and the xterm packages and gained explicit `ui-primitives` + `clsx` declarations.
+- Impact: the sidebar no longer shows a terminal entry; the settings General section keeps the shell picker; every dropdown built on the shared `Menu` now matches the trigger width.
+- Notes: no profile patch change needed — the shipped profile enables both rows; rebuild the desktop bundle/installer so the GUI ships without the panel.
+
+### Integrated terminal shell picker (PowerShell / CMD / Git Bash / WSL)
+
+- Goal: add an integrated terminal to the desktop Web UI, with a settings choice for the startup shell — PowerShell 7, Windows PowerShell, Command Prompt, Git Bash, or WSL.
+- Files: packages/subprocess/subprocess/src/types.ts, packages/subprocess/subprocess-local/src/terminal.ts, packages/subprocess/subprocess-e2b/src/terminal.ts, packages/terminal/terminal-host (new), packages/client/ui-terminal (new), packages/host/apiproxy/src/api-proxy.ts, packages/bundle/web-app/cordis.patch.yml + package.json, tsconfig.host.json, tsconfig.client.json, README.md, README.zh.md.
+- Changes:
+  - `SubprocessTerminalHandle` gains `resize(cols, rows)` (local node-pty implementation; the E2B provider rejects it explicitly).
+  - Windows terminal support: `createProcessInspector` returns a null inspector on win32 (node-pty spawn/write/resize work; foreground inspection, descendant tracking, and signal delivery are unavailable, so teardown stops the top-level shell only) — this also makes `dsh-terminal-bash`-style spawning possible on Windows.
+  - New `@deepseek-ai/dsh-terminal-host`: shell resolution/probing (pwsh/powershell/cmd/git-bash/wsl), the `terminal` settings namespace, and the HTTP surface — POST `/terminal/spawn`, GET `/terminal/:id/stream` (SSE output + exit), POST write/resize/kill. Sessions are in-memory, terminated on stream close or dispose.
+  - New `@deepseek-ai/dsh-client-ui-terminal`: an xterm.js panel opened from a sidebar footer action (shell comes from the setting; no in-panel picker), and a General-settings "Integrated Terminal Shell" preference row (dropdown, the permission-preset row shape) persisting the choice.
+  - `dsh-pwsh-local` switches the executing shell per call from the `terminal.shell` preference: `cmd` runs `cmd /d /s /c`, `git-bash` runs Git Bash's `bash -c`, `wsl` runs `wsl bash -c`; everything else keeps the PowerShell dialect. The agent's command tool therefore runs in the terminal mode the user selected in settings.
+  - The `terminal` settings namespace joins the web settings allowlist.
+- Impact: a user-facing terminal with a selectable shell is available in the GUI; model-facing terminal behavior (dsh-terminal-bash) is unchanged.
+- Notes: the panel depends on the local subprocess provider (E2B resize unsupported); rebuild the desktop bundle for the new packages to ship.
+
+### Differential message snapshots (history.db size)
+
+- Goal: history.db ballooned because every message snapshot stored a FULL copy of every workspace text file; unchanged files should never enter the database.
+- Files: apps/desktop/src-tauri/src/diff_server.rs, README.md, README.zh.md.
+- Changes:
+  - Message snapshots are now differential: the FIRST snapshot stores the full session baseline, later ones store only files whose mtime moved plus NULL rows for deleted files; unchanged files never hit the database (a 500-file workspace with 2 changed files stores 502 rows, not 1500).
+  - `file_state` (full-content state table) is dropped; `file_meta` tracks path+mtime only; the changes comparison reference falls back to the first snapshot for never-recorded paths; review/rollback/preview read the latest snapshot record per path.
+  - One-time migration (user_version-guarded) drops the old full-content table and VACUUMs the database; the migration is best-effort (a concurrent write can hold the exclusive lock the VACUUM needs, in which case it defers to a later open). Write batches use BEGIN IMMEDIATE so concurrent snapshot requests serialize instead of interleaving or both running the full baseline scan.
+- Impact: history.db grows with actual changes instead of workspace size; existing rollback data stays valid (the old full snapshots are just the baseline plus per-message full copies, which the latest-record lookup handles).
+- Notes: rebuild the desktop installer (Rust shell) for the changes to take effect.
+
+### Code-review drawer performance and concurrency fixes
+
+- Goal: the code-review drawer's first open was tens of seconds slow and a second open could come up empty on large non-git workspaces.
+- Files: apps/desktop/src-tauri/src/diff_server.rs, packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.tsx, README.md, README.zh.md.
+- Changes:
+  - The diff server now handles one thread per connection; a slow request (a full message snapshot) no longer stalls every later review/rollback request, and SQLite connections get a busy timeout for concurrent writes.
+  - Batch writes (session initialization, message snapshots, change recording) run inside ONE transaction instead of auto-committing per row — the dominant cost of the slow first open.
+  - `snapshot_review` no longer reads every workspace file: baseline-known paths are read individually, and new files come from a stat-only directory walk.
+  - The drawer resets a stale file selection between opens so the diff area never stays empty after a payload change.
+  - Reopening the drawer keeps the previous payload visible while a background refresh runs (loading only blocks the first fetch), and the snapshot review is cached server-side for 3 seconds, so repeat opens are instant instead of waiting for the next full computation.
+- Impact: the non-git review opens in seconds instead of tens of seconds, and repeated opens always show content.
+- Notes: rebuild the desktop installer (Rust shell) for the backend changes to take effect.
+
+### Rollback preview and safe restore (cc-haha rewind contract)
+
+- Goal: bring the conversation rollback up to the cc-haha rewind safety contract — preview the files a rollback will restore (with per-file diffs and +/- counts) before confirming, refuse path escapes and symlink writes, and report what cannot be restored.
+- Files: apps/desktop/src-tauri/src/diff_server.rs, packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx, packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts, packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx, README.md, README.zh.md.
+- Changes:
+  - New `/code-review/rollback/preview` endpoint: per-file snapshot-vs-current diffs (states `modified` / `deleted` / `created`), +/- totals, and the skipped/unrestorable list; the frontend dialog now loads this preview and shows the file list with an expandable diff surface before the confirm button is enabled.
+  - `restore_files` now resolves every target through `safe_target`: the canonicalized parent must stay inside the canonicalized workspace (blocks `..` escapes and tampered history.db paths), and writes through symbolic links are refused; the rollback response carries the `skipped` list.
+  - Unrestorable files are reported in the dialog instead of silently skipped.
+- Impact: rollback is preview-then-confirm with per-file diffs and explicit skipped reporting; a malicious or accidental snapshot path can no longer write outside the workspace. Non-git workspaces are unaffected (snapshot review from the previous change).
+- Notes: rebuild the desktop installer (Rust shell) for the backend endpoints to take effect.
+
+### Code-review drawer: per-file syntax-highlighted diff review
+
+- Goal: upgrade the desktop code-review drawer from a plain `<pre>` blob into a per-file review surface with line numbers, +/- prefixes, and syntax highlighting (mirroring the workspace-diff review UX of Claude Code Haha).
+- Files: packages/client/ui-sidebar-toggle/src/client/diff-model.ts (new), packages/client/ui-sidebar-toggle/src/client/DiffReviewSurface.tsx (new), packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.tsx, packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts, packages/client/ui-sidebar-toggle/tests/diff-model.client.spec.ts, packages/client/ui-sidebar-toggle/tests/DiffReviewSurface.client.spec.tsx, packages/client/ui-primitives/src/index.ts, README.md, README.zh.md.
+- Changes:
+  - Added `parseWorkspaceDiff` / `parseUntrackedFiles` / `untrackedRows` / `languageFromPath` (pure diff parsing; hunk line numbers, metadata chrome, untracked new-file contents).
+  - Added `DiffReviewSurface`, a pure-presentation component: two-column line-number gutter, +/- prefixes, hunk/metadata chrome, per-line shiki highlighting via the shared `highlightLines`, and middle-collapse for long diffs.
+  - The code-review drawer's file list is now clickable and selects one file; the diff area renders the selected file (tracked diff or untracked new file).
+  - Exported `highlightLines` / `HighlightSpan` from `@deepseek-ai/dsh-client-ui-primitives` (previously internal to the markdown module).
+  - The drawer maps the diff server's non-git error to the localized "not a Git repository" hint instead of showing the raw English message.
+  - Non-git workspaces now get a session-baseline review: the diff server serves a snapshot diff (file_state/changes history vs current contents) when a session is supplied, and the drawer sends the session id and skips git-based watching for it.
+- Impact: the Code Review drawer (Ctrl+Alt+B / header button) shows each changed file with real syntax highlighting instead of a raw text dump; no backend or wire changes.
+- Notes: rebuild the web bundle for the change to take effect. Pre-existing repository state: GUI component tests across `packages/client` fail under the current root install because react 19 (pulled by a hoisted @testing-library/react peer resolution) is mixed with package-local react 18; this package's tests mount through react-dom 18 directly to stay green.
+
+### Stale fallback-link replacement retries on Windows
+
+- Goal: stop the desktop app from dying on the launch screen when replacing a stale `$DSH_HOME/profiles/node_modules` fallback junction whose target moved (e.g. a dev build pointed it at its own bundle, then the installed app re-points it).
+- Files: packages/boot/app-boot/src/profile.ts, README.md, README.zh.md.
+- Changes: `ensureSymlink` now replaces a wrong-target link through `unlinkWithRetry`, which retries EPERM/EBUSY (a live process holding the reparse point — typically a previously launched instance) up to 5 times at 200 ms, treats ENOENT as success, and fails loud with the link path, wanted target, and remedy instead of a bare EPERM aborting boot.
+- Impact: transient holders (startup races, antivirus scans) self-heal; a persistent holder produces a clear diagnostic. Existing behavior is unchanged for correct links and non-Windows platforms.
+- Notes: rebuild the desktop installer for the change to take effect.
+
+### GUI 插件管理与识图配置修复
+
+- Goal: fix the desktop Web GUI's plugin-management paths and expose the describe-image vision-endpoint settings card for in-GUI editing.
+- Files: packages/host/apiproxy/src/api-proxy.ts, README.md, README.zh.md.
+- Changes:
+  - Added `describe-image` to `WEB_SETTINGS_NAMESPACES` so the third-party describe-image plugin's settings card is served to the Web client (previously `settings-not-exposed`).
+  - `runPluginCommand` now invokes the `@deepseek-ai/dsh` CLI entry (`lib/bin.js`) directly through `process.execPath` instead of `pnpm dsh`, which failed outside a harness checkout with ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL.
+  - `profileDir`, `instructionsPath`, and `userSkillRoot` now resolve `$DSH_HOME` first (fallback `~/.dsh`), matching `resolveDshHome`; the Persona page previously wrote `~/.dsh/AGENTS.md` while agent-instructions injected `$DSH_HOME/AGENTS.md`.
+  - Removed the `dsh-bash` market entry whose source `@deepseek-ai/dsh-shell-bash` is not published; market installs now pin the `next` dist-tag (`<pkg>@next`) because the registry `latest` tag still points at the pre-bundle `0.0.1-rc.1`.
+- Impact: plugin install/uninstall and the plugin market work in the desktop deployment; the Image understanding settings card is editable from the GUI; user-global AGENTS.md written through the Persona page is actually injected.
+- Notes: rebuild the desktop installer (apps/desktop prepare:bundle + apps/desktop-installer build:setup) for the changes to take effect.
+
+### Right panel pure-white style
+
+- Goal: keep the right panel (Preview + Files/Changes) readable in every shell theme by making it a fixed pure-white palette with high-contrast text and buttons.
+- Files: packages/client/dsh-aionui-panel/src/client/styles/tokens.module.css, packages/client/dsh-aionui-panel/src/client/styles/explorer.module.css, packages/client/dsh-aionui-panel/src/client/styles/scm.module.css, packages/client/dsh-aionui-panel/src/client/index.ts, packages/client/dsh-aionui-panel/README.md, packages/client/dsh-aionui-panel/README.zh.md.
+- Changes: removed the panel dark-theme token override; all panel surfaces now use white backgrounds; text, toolbar labels, tree arrows and collapse controls use darker high-contrast ink; color-scheme light is asserted on panel roots and floating chrome.
+- Impact: the AionUI right panel no longer follows the shell dark theme; existing layout, drag, preview and git behaviors are unchanged.
+- Notes: rebuild the web bundle and desktop shell for the change to take effect.
+
+### Rollback confirmation dialog
+
+- Goal: make the rollback confirmation a centered in-page dialog in the NexBox style.
+- Files: packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx, packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts.
+- Changes: replaced the native window.confirm with the shared Modal primitive; the title, message, and action buttons are centered, and localized Cancel/Rollback labels were added.
+- Impact: the confirmation dialog stays inside the desktop WebUI and follows the current theme; snapshot and file restore behavior is unchanged.
+- Notes: rebuild the web bundle and desktop shell for the change to take effect.
+
+- Goal: remove the wallpaper/background-image feature from Web settings and fix the transparent right details panel.
+- Files: packages/bundle/web-app/package.json, packages/bundle/web-app/cordis.patch.yml, tsconfig.client.json, packages/client/ui-skin-maid-atelier/src/client/maid-atelier.module.css; deleted packages/client/ui-background.
+- Changes: removed the ui-background plugin from the Web plugin roster and dependency tree; deleted the plugin package; made the right details panel opaque white in light mode and opaque dark in dark mode.
+- Impact: the General settings no longer show the background/wallpaper controls; the desktop bundle must be regenerated for the change to take effect.
+- Notes: the skin's own palace/character backdrop was not changed.
+
+
+### Code Review drawer layer
+
+- Goal: make Code Review render like the left drawer and stay on the top layer.
+- Files: packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.tsx.
+- Changes: the Code Review drawer is now portaled to document.body so it escapes nested stacking contexts and renders above conversation and sidebar layers.
+- Impact: the drawer no longer gets buried inside transformed ancestors; theme and background behavior are unchanged.
+- Notes: rebuild the web bundle and desktop shell for the change to take effect.
+
+
+### Conversation rollback (SQLite history)
+
+- Goal: give every conversation a rollback button that restores files changed by the conversation to their pre-conversation state.
+- Files: apps/desktop/src-tauri/src/diff_server.rs, apps/desktop/src-tauri/Cargo.toml, packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.tsx, packages/client/ui-sidebar-toggle/src/client/CodeReviewAction.module.css, packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx, packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts.
+- Changes: the desktop diff server now creates and writes a local SQLite history at <workspace>/.recode/history.db, records file diffs while a session is active, and exposes snapshot/status/rollback endpoints. User-sent messages show a small rollback button; clicking it restores files and the conversation log to the snapshot taken before that user message.
+- Impact: all history and rollback stays local; no server or network is required. Binary files are skipped.
+- Notes: a snapshot is created when each user message mounts in the conversation, and clicking that message rolls back its files and conversation log to the snapshot. The desktop shell no longer copies the live session JSONL directly; offset-based session-log restore is implemented.

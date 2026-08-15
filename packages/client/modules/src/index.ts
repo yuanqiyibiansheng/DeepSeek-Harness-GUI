@@ -341,7 +341,7 @@ export class ClientModuleRegistry extends Service {
       this.pkgMeta.set(pkgName, null)
       return null
     }
-    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as Record<string, unknown>
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf8').replace(/^\uFEFF/, '')) as Record<string, unknown>
     const dsh = pkg.dsh
     const decl = parseDshClient(
       pkgName,

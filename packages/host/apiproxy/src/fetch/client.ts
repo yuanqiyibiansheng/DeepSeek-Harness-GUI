@@ -69,6 +69,7 @@ import {
   credentialsDescribeValueSchema, credentialsSetValueSchema, credentialsUnsetValueSchema,
 } from '../api/credentials.schema.ts'
 import { llmDiscoverModelsValueSchema, llmModelsValueSchema, llmProvidersValueSchema } from '../api/llm.schema.ts'
+import { visionEnableValueSchema, visionStatusValueSchema, visionTestValueSchema } from '../api/vision.schema.ts'
 import {
   subagentHistoryValueSchema,
   subagentInterruptValueSchema,
@@ -180,6 +181,11 @@ export interface IApiClient {
     models(payload: RequestPayload<'llm.models'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.models'>>>
     discoverModels(payload: RequestPayload<'llm.discoverModels'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'llm.discoverModels'>>>
   }
+  vision: {
+    status(payload: RequestPayload<'vision.status'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'vision.status'>>>
+    test(payload: RequestPayload<'vision.test'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'vision.test'>>>
+    enable(payload: RequestPayload<'vision.enable'>, signal?: AbortSignal): Promise<RpcResponse<ResponseValue<'vision.enable'>>>
+  }
   /** client-response passthrough (rpcId is a backfill of the server-request's id — never minted here). */
   respond(message: ClientResponse, signal?: AbortSignal): Promise<RpcReceipt>
 }
@@ -250,6 +256,9 @@ const UNARY_VALUE_SCHEMAS: { [K in keyof RpcMethodMap]: z.ZodType<Wire<ResponseV
   'llm.providers': llmProvidersValueSchema,
   'llm.models': llmModelsValueSchema,
   'llm.discoverModels': llmDiscoverModelsValueSchema,
+  'vision.status': visionStatusValueSchema,
+  'vision.test': visionTestValueSchema,
+  'vision.enable': visionEnableValueSchema,
 }
 
 /** Default timeout for bounded unary calls (rpc-compare 2026-07-19: a hung host must not leave callers pending forever). */
@@ -538,6 +547,12 @@ export abstract class AbstractApiClient implements IApiClient {
     providers: (payload, signal) => this.callUnary('llm.providers', payload, signal),
     models: (payload, signal) => this.callUnary('llm.models', payload, signal),
     discoverModels: (payload, signal) => this.callUnary('llm.discoverModels', payload, signal),
+  }
+
+  readonly vision: IApiClient['vision'] = {
+    status: (payload, signal) => this.callUnary('vision.status', payload, signal),
+    test: (payload, signal) => this.callUnary('vision.test', payload, signal),
+    enable: (payload, signal) => this.callUnary('vision.enable', payload, signal),
   }
 
   readonly events: IApiClient['events'] = {

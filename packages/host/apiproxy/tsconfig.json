@@ -9,7 +9,13 @@
   ],
   "references": [
     {
+      "path": "../../fs/fs"
+    },
+    {
       "path": "../../goal/goal"
+    },
+    {
+      "path": "../../core/scope"
     },
     {
       "path": "../../settings/settings"
@@ -49,6 +55,9 @@
     },
     {
       "path": "../../core/tools"
+    },
+    {
+      "path": "../../core/system-prompt"
     },
     {
       "path": "../../session/session-persistence"
