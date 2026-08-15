@@ -124,6 +124,17 @@ describe('resolveBundleDir', () => {
 })
 
 describe('loadProfile', () => {
+  it('skips a broken user patch layer instead of failing the profile load', () => {
+    const anchor = stageInstallation({})
+    const home = tmp()
+    const dir = resolveProfileDir('demo', home)
+    initProfile(dir, [])
+    writeFileSync(join(dir, PROFILE_PATCH_FILENAME), '# comments only\n')
+    expect(loadProfile('t', 'demo', anchor, home).patches).toEqual([])
+    writeFileSync(join(dir, PROFILE_PATCH_FILENAME), 'not: an-array\n')
+    expect(loadProfile('t', 'demo', anchor, home).patches).toEqual([])
+  })
+
   it('resolves each dsh.profile.bundles entry to its patch layer in order, plus the user layer', () => {
     const anchor = stageInstallation({
       'bundle-a': { patch: '- insert:\n    - id: a\n      name: pkg-a\n' },
@@ -194,12 +205,12 @@ describe('loadProfile', () => {
     ])
   })
 
-  it('fails loud when a listed bundle declares no dsh.bundle', () => {
+  it('skips a listed bundle that declares no dsh.bundle instead of failing the profile load', () => {
     const anchor = stageInstallation({ 'not-a-bundle': {} })
     const home = tmp()
     const dir = resolveProfileDir('demo', home)
     initProfile(dir, ['not-a-bundle'])
-    expect(() => loadProfile('t', 'demo', anchor, home)).toThrow('declares no dsh.bundle')
+    expect(loadProfile('t', 'demo', anchor, home).layers).toEqual([])
   })
 })
 

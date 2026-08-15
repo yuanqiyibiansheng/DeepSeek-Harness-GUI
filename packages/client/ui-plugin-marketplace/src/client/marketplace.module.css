@@ -101,6 +101,28 @@
   color: var(--dsw-alias-state-success-primary);
 }
 
+.restartBtn {
+  margin-left: 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-3);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+  border-radius: 7px;
+  padding: 3px 12px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+
+.restartBtn:hover {
+  border-color: var(--dsw-alias-label-dimmed);
+}
+
+.restartBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .cards {
   list-style: none;
   margin: 0;

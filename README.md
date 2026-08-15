@@ -71,6 +71,22 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### User patch layer tolerance (marketplace plugins cannot block launch)
+
+- Goal: installing public marketplace plugins could write a non-Cordis package or a malformed `cordis.patch.yml` into the web profile, making the client stick on "Starting DeepSeek Harness..." because profile preparation or boot rejected the whole tree.
+- Files: packages/boot/app-boot/src/profile.ts (loadProfile now warns and skips an unreadable `cordis.patch.yml` instead of failing), apps/cli/src/profile-boot.ts (home/profile user patch reads fall back to an empty layer; boot retries without the user layer when the first boot fails), packages/boot/app-boot/tests/profile.spec.ts (broken user-layer and bundle-less bundle coverage), README.md, README.zh.md.
+- Changes: the user patch layer is now best-effort. A malformed, comments-only, or non-array file is skipped with a warning; if the composed user layer still fails during boot, the launcher retries with bundle and overlay layers only. The current web profile was cleaned by removing the invalid `pm-plaindeck` insert and the empty `@microi.net/cli` bundle entry.
+- Impact: a broken marketplace-installed plugin no longer blocks the desktop app from opening; official bundle-layer errors still fail loudly.
+- Notes: the skipped layer prints a warning to stderr; remove or repair the offending plugin in Settings before restarting to restore it.
+
+### Marketplace install feedback and one-click service restart
+
+- Goal: after clicking install, the result card reverted to the install button (only the installed list below refreshed), so success looked like failure; and newly installed plugins only appear in Settings → Plugins after the service restarts, which had no in-app path.
+- Files: packages/client/ui-plugin-marketplace/src/client/MarketplaceTab.tsx (patch search-result cards with the install/uninstall outcome immediately, so the button flips to installed/uninstalled truthfully; success notice gains an "立即重启" button), packages/client/ui-plugin-marketplace/src/client/marketplace.module.css (restart button), apps/desktop/src-tauri/src/lib.rs (restart_service command: kill the backend child, spawn a fresh backend, reload main+pet windows; backend startup extracted into spawn_backend), apps/desktop/src-tauri/build.rs (app manifest commands + restart_service), apps/desktop/src-tauri/capabilities/default.json (allow-restart-service), README.md, README.zh.md.
+- Changes: install/uninstall now update the result cards in place; after a successful install the notice offers one-click restart, which reloads the dsh service so the new plugin activates and appears in the plugin list.
+- Impact: the marketplace shows truthful button states during/after operations, and activating an installed plugin is one click away.
+- Notes: restarting interrupts the running session (history is kept); the button only appears in the desktop shell.
+
 ### Source rebuild of desktop bundle and installer
 
 - Goal: prevent the public-plugin startup failure from recurring and ship a fresh installer built from the latest source; also remove stale TypeScript compiler artifacts that had been emitted into `packages/*/*/src`.

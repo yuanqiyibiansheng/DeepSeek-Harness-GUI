@@ -79,7 +79,7 @@ pub fn run() {
         let _ = window.unminimize();
       }
     }))
-    .invoke_handler(tauri::generate_handler![pet_control])
+    .invoke_handler(tauri::generate_handler![pet_control, restart_service])
     .setup(|app| {
       app.manage(BackendState(Mutex::new(None)));
       if let Ok(data_dir) = app.path().app_data_dir() {
@@ -128,32 +128,7 @@ pub fn run() {
           });
         }
       }
-      thread::spawn(move || {
-        match start_backend(&handle) {
-          Ok((child, port)) => {
-            if let Some(state) = handle.try_state::<BackendState>() {
-              if let Ok(mut guard) = state.0.lock() {
-                *guard = Some(child);
-              }
-            }
-            let url = format!("http://127.0.0.1:{port}").parse::<Url>();
-            if let Ok(url) = url {
-              let _ = window.navigate(url);
-            }
-            // The pet window loads the standalone pet page served by the same
-            // backend (same origin: BroadcastChannel carries the activity).
-            let pet_url = format!("http://127.0.0.1:{port}/pet.html").parse::<Url>();
-            if let Ok(pet_url) = pet_url {
-              if let Some(pet) = handle.get_webview_window("pet") {
-                let _ = pet.navigate(pet_url);
-              }
-            }
-          }
-          Err(error) => {
-            eprintln!("dsh desktop backend failed: {error}");
-          }
-        }
-      });
+      spawn_backend(&handle);
       Ok(())
     })
     .build(tauri::generate_context!())
@@ -195,6 +170,56 @@ fn pet_control(app: AppHandle, action: String) {
     }
     _ => {}
   }
+}
+
+/// Restart the dsh web backend in place: kill the current backend child,
+/// start a fresh one, and reload the main and pet windows. Used by the
+/// marketplace after install/uninstall so newly activated plugins load.
+#[tauri::command]
+fn restart_service(app: AppHandle) -> Result<(), String> {
+  if let Some(state) = app.try_state::<BackendState>() {
+    if let Ok(mut guard) = state.0.lock() {
+      if let Some(child) = guard.as_mut() {
+        kill_tree(child);
+      }
+    }
+  }
+  spawn_backend(&app);
+  Ok(())
+}
+
+/// Start the dsh web backend in a background thread and navigate the main and
+/// pet windows to it once the port answers.
+fn spawn_backend(app: &AppHandle) {
+  let handle = app.clone();
+  thread::spawn(move || {
+    match start_backend(&handle) {
+      Ok((child, port)) => {
+        if let Some(state) = handle.try_state::<BackendState>() {
+          if let Ok(mut guard) = state.0.lock() {
+            *guard = Some(child);
+          }
+        }
+        let url = format!("http://127.0.0.1:{port}").parse::<Url>();
+        if let Ok(url) = url {
+          if let Some(window) = handle.get_webview_window("main") {
+            let _ = window.navigate(url);
+          }
+        }
+        // The pet window loads the standalone pet page served by the same
+        // backend (same origin: BroadcastChannel carries the activity).
+        let pet_url = format!("http://127.0.0.1:{port}/pet.html").parse::<Url>();
+        if let Ok(pet_url) = pet_url {
+          if let Some(pet) = handle.get_webview_window("pet") {
+            let _ = pet.navigate(pet_url);
+          }
+        }
+      }
+      Err(error) => {
+        eprintln!("dsh desktop backend failed: {error}");
+      }
+    }
+  });
 }
 
 fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {  let root = resolve_bundle_root(app).ok_or_else(|| {

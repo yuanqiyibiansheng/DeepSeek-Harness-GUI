@@ -6,5 +6,5 @@
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
-  "permissions": ["core:default", "allow-pet-control"]
+  "permissions": ["core:default", "allow-pet-control", "allow-restart-service"]
 }

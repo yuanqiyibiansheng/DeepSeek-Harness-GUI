@@ -98,6 +98,8 @@ export function MarketplaceTab({ t, search, installed, install, uninstall }: Mar
   const [searchError, setSearchError] = useState<string | null>(null)
   const [busy, setBusy] = useState<Record<string, string>>({})
   const [notice, setNotice] = useState<{ kind: 'error' | 'success'; text: string } | null>(null)
+  const [needsRestart, setNeedsRestart] = useState<string | null>(null)
+  const [restarting, setRestarting] = useState(false)
   const [installedState, setInstalledState] = useState<InstalledState>({ status: 'loading', plugins: [] })
   const [installedTick, setInstalledTick] = useState(0)
   const autoSearchRef = useRef(false)
@@ -139,11 +141,46 @@ export function MarketplaceTab({ t, search, installed, install, uninstall }: Mar
     runSearch(query)
   }
 
+  /** Reflect one install/uninstall result into the search-result cards so the
+   * button state is truthful without a re-search round trip. */
+  const patchResult = (name: string, installed: MarketplaceSearchHit['installed']): void => {
+    setResults(current => current.map(item => item.name === name ? { ...item, installed } : item))
+  }
+
+  /** Whether the page runs inside the desktop shell (Tauri webview). */
+  const isTauriShell = (): boolean => (
+    typeof window !== 'undefined'
+    && (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ !== undefined
+  )
+
+  /** Ask the desktop shell to restart the dsh service in place (activates new plugins). */
+  const restartService = (): void => {
+    if (restarting) return
+    setRestarting(true)
+    const internals = (window as unknown as {
+      __TAURI_INTERNALS__?: { invoke(command: string, args?: unknown): Promise<unknown> }
+    }).__TAURI_INTERNALS__
+    if (internals === undefined) {
+      setRestarting(false)
+      return
+    }
+    try {
+      void internals.invoke('restart_service')
+    } catch {
+      setRestarting(false)
+    }
+  }
+
   const doInstall = (name: string): void => {
     if (busy[name] !== undefined) return
     setBusy((current) => ({ ...current, [name]: 'installing' }))
     setNotice(null)
+    setNeedsRestart(null)
     install(name).then((value) => {
+      if (value.ok) {
+        patchResult(name, { version: value.version ?? '', isBundle: value.isBundle ?? false, isClient: value.isClient ?? false })
+        if (value.needsRestart === true) setNeedsRestart(name)
+      }
       setNotice(value.ok
         ? { kind: 'success', text: `${t('installDone')}${name}${value.needsRestart === true ? ` · ${t('restartHint')}` : ''}` }
         : { kind: 'error', text: `${t('installFailed')}${name}: ${value.error ?? ''}` })
@@ -163,7 +200,12 @@ export function MarketplaceTab({ t, search, installed, install, uninstall }: Mar
     if (busy[name] !== undefined) return
     setBusy((current) => ({ ...current, [name]: 'uninstalling' }))
     setNotice(null)
+    setNeedsRestart(null)
     uninstall(name).then((value) => {
+      if (value.ok) {
+        patchResult(name, null)
+        if (value.needsRestart === true) setNeedsRestart(name)
+      }
       setNotice(value.ok
         ? { kind: 'success', text: `${t('uninstallDone')}${name}${value.needsRestart === true ? ` · ${t('restartHint')}` : ''}` }
         : { kind: 'error', text: `${t('uninstallFailed')}${name}: ${value.error ?? ''}` })
@@ -225,6 +267,16 @@ export function MarketplaceTab({ t, search, installed, install, uninstall }: Mar
       {notice !== null && (
         <p className={css.notice} data-kind={notice.kind}>
           {notice.text}
+          {notice.kind === 'success' && needsRestart !== null && isTauriShell() && (
+            <button
+              type="button"
+              className={css.restartBtn}
+              disabled={restarting}
+              onClick={restartService}
+            >
+              {restarting ? '正在重启服务…' : '立即重启'}
+            </button>
+          )}
         </p>
       )}
       <div className={css.catalogHeading}>
