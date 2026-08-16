@@ -1,6 +1,7 @@
 use std::ffi::OsStr;
 use std::fs;
 use std::os::windows::ffi::OsStrExt;
+use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -12,6 +13,7 @@ use winreg::RegKey;
 const APP_NAME: &str = "DeepSeek Harness";
 const APP_EXE: &str = "DeepSeek Harness.exe";
 const UNINSTALL_KEY: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\DeepSeek Harness";
+const CREATE_NO_WINDOW: u32 = 0x08000000;
 const PAYLOAD_ZIP: &[u8] = include_bytes!("../payload.zip");
 const UNINSTALL_EXE: &[u8] = include_bytes!("../uninstall.exe");
 
@@ -49,6 +51,7 @@ pub fn get_default_install_path() -> String {
 fn kill_running_app() {
   let _ = Command::new("taskkill")
     .args(["/IM", APP_EXE, "/T", "/F"])
+    .creation_flags(CREATE_NO_WINDOW)
     .output();
   std::thread::sleep(std::time::Duration::from_millis(500));
 }
@@ -99,20 +102,24 @@ pub fn get_resource_files() -> Result<Vec<FileEntry>, String> {
 }
 
 #[tauri::command]
-pub fn install(target_dir: String, create_desktop_shortcut: bool) -> Result<(), String> {
-  let target = PathBuf::from(&target_dir);
-  fs::create_dir_all(&target).map_err(|e| e.to_string())?;
-  kill_running_app();
-  extract_payload(&target)?;
-  seed_user_skills(&target)?;
-  register_uninstall(&target_dir)?;
-  write_uninstall_script(&target)?;
-  fs::write(target.join("uninstall.exe"), UNINSTALL_EXE).map_err(|e| e.to_string())?;
-  create_shortcut(APP_NAME, &target.join(APP_EXE), "StartMenu")?;
-  if create_desktop_shortcut {
-    create_shortcut(APP_NAME, &target.join(APP_EXE), "Desktop")?;
-  }
-  Ok(())
+pub async fn install(target_dir: String, create_desktop_shortcut: bool) -> Result<(), String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    let target = PathBuf::from(&target_dir);
+    fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+    kill_running_app();
+    extract_payload(&target)?;
+    seed_user_skills(&target)?;
+    register_uninstall(&target_dir)?;
+    write_uninstall_script(&target)?;
+    fs::write(target.join("uninstall.exe"), UNINSTALL_EXE).map_err(|e| e.to_string())?;
+    create_shortcut(APP_NAME, &target.join(APP_EXE), "StartMenu")?;
+    if create_desktop_shortcut {
+      create_shortcut(APP_NAME, &target.join(APP_EXE), "Desktop")?;
+    }
+    Ok(())
+  })
+  .await
+  .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

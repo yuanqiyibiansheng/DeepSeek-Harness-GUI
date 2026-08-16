@@ -71,6 +71,94 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Sidebar toggle no longer re-renders the workbench every frame
+
+- Goal: remove the dropped-frame displacement of conversation content while
+  the right sidebar expands or collapses.
+- Files: third_party/dsh-better-sidebar/src/client/Sidebar.tsx,
+  third_party/dsh-better-sidebar/lib/client.js, README.md, README.zh.md.
+- Changes: the measured center-column edges now update CSS custom properties
+  directly instead of calling `setState` from every `ResizeObserver`
+  callback; React no longer re-renders the whole Sidebar on each animation
+  frame.
+- Impact: the panel slide and conversation reflow animation are unchanged,
+  but the workbench state updates no longer compete with the CSS layout
+  transition, so expanding and collapsing the sidebar is smoother.
+- Notes: rebuild the web bundle and desktop installer for the change to take
+  effect.
+
+### Installer runs file extraction off the UI thread
+
+- Goal: keep the setup window responsive and draggable while the Installing
+  step extracts the payload and writes installed files.
+- Files: apps/desktop-installer/src-tauri/src/installer.rs, README.md,
+  README.zh.md.
+- Changes: `install` is now an async Tauri command and runs its blocking work
+  through `tauri::async_runtime::spawn_blocking`.
+- Impact: extraction, shortcut creation, and registry writes no longer stall
+  the installer UI thread; the frontend still awaits the command before
+  advancing to the next step.
+- Notes: the installer exe was rebuilt from source after this fix.
+
+### Installer no longer flashes a console window while stopping the running app
+
+- Goal: remove the black command window that appears during the Installing
+  step when the setup shell runs `taskkill` to stop a previous DeepSeek Harness
+  instance.
+- Files: apps/desktop-installer/src-tauri/src/installer.rs, README.md,
+  README.zh.md.
+- Changes: `kill_running_app` starts `taskkill` with `CREATE_NO_WINDOW`; the
+  force tree kill and wait behavior are unchanged.
+- Impact: the fourth installer step no longer briefly opens a black console
+  window.
+- Notes: the installer exe was rebuilt from source after this fix.
+
+### Installer Rust build compiles with the Tauri window manager import
+
+- Goal: restore the missing `Manager` trait import so the installer's
+  `get_webview_window` call compiles when rebuilding the Rust shell.
+- Files: apps/desktop-installer/src-tauri/src/lib.rs, README.md, README.zh.md.
+- Changes: added `use tauri::Manager;` to `lib.rs`; the window setup logic is
+  otherwise unchanged.
+- Impact: `npm run build:setup` can complete the Cargo release build and
+  produce `dsh-desktop-installer.exe`; installer startup and the window-show
+  fallback behavior are unchanged.
+- Notes: the installer exe was rebuilt from source after this fix.
+
+### Installer window visibility fix
+
+- Goal: the hidden-start installer stayed invisible after double-click because
+  the frontend `show()` call was rejected by the capability policy and no
+  native fallback showed the window.
+- Files: apps/desktop-installer/src-tauri/capabilities/default.json
+  (`core:window:allow-show`), apps/desktop-installer/src-tauri/src/lib.rs
+  (setup thread shows the main window after 1.5s as a fallback), README.md,
+  README.zh.md.
+- Changes: the frontend is allowed to reveal the window once React mounts; if
+  that call fails for any reason, the native shell shows the window after 1.5
+  seconds so the installer always appears.
+- Impact: double-clicking the installer always opens the setup page; the
+  no-black-flash behavior is retained because the window starts hidden.
+- Notes: the installer exe was rebuilt from source.
+
+### White terminal text and hidden installer startup
+
+- Goal: the sidebar terminal followed the theme label token, so normal output
+  was not pure white; the frameless installer still flashed black before the
+  WebView painted.
+- Files: third_party/dsh-better-sidebar/src/client/TerminalView.tsx and
+  third_party/dsh-better-sidebar/lib/client-terminal.js (terminal background
+  fixed to `#111114`, foreground fixed to `#ffffff`),
+  apps/desktop-installer/src-tauri/tauri.conf.json (`visible: false`),
+  apps/desktop-installer/src/App.tsx (shows the window after React mounts),
+  README.md, README.zh.md.
+- Changes: the sidebar terminal now always renders white text on a dark
+  surface, independent of the active theme. The installer starts hidden and
+  only becomes visible after the first React commit, so no black frame can
+  appear during WebView startup.
+- Impact: terminal output is readable pure white; installer launch is seamless.
+- Notes: the desktop exe and custom installer were rebuilt from source.
+
 ### Installer startup no longer flashes a black window
 
 - Goal: the frameless custom installer showed a black window for a moment

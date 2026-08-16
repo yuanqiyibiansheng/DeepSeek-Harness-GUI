@@ -7041,7 +7041,7 @@ window.__ModuleLoader__.load({
 				store,
 				ctx
 			]);
-			const [centerRect, setCenterRect] = (0, react.useState)({
+			const centerRectRef = (0, react.useRef)({
 				left: 0,
 				right: 0
 			});
@@ -7052,10 +7052,14 @@ window.__ModuleLoader__.load({
 				const col = centerColRef.current;
 				if (col === null) return;
 				const rect = col.getBoundingClientRect();
-				setCenterRect((prev) => prev.left === rect.left && prev.right === rect.right ? prev : {
+				const next = {
 					left: rect.left,
 					right: rect.right
-				});
+				};
+				centerRectRef.current = next;
+				const rootStyle = document.documentElement.style;
+				rootStyle.setProperty("--dsh-center-left", `${next.left}px`);
+				rootStyle.setProperty("--dsh-center-right", `${window.innerWidth - next.right}px`);
 			}, []);
 			(0, react.useEffect)(() => {
 				let disposed = false;
@@ -7088,6 +7092,9 @@ window.__ModuleLoader__.load({
 					observer?.disconnect();
 					watcher.disconnect();
 					centerColRef.current = null;
+					const rootStyle = document.documentElement.style;
+					rootStyle.removeProperty("--dsh-center-left");
+					rootStyle.removeProperty("--dsh-center-right");
 				};
 			}, [measureCenter]);
 			/**
@@ -7157,7 +7164,7 @@ window.__ModuleLoader__.load({
 			const applyDrag = (width, height) => {
 				panelRef.current?.style.setProperty("width", `${width}px`);
 				bottomRef.current?.style.setProperty("height", `${height}px`);
-				bottomRef.current?.style.setProperty("right", `${window.innerWidth - centerRect.right + (width - (state?.width ?? 0))}px`);
+				bottomRef.current?.style.setProperty("right", `${window.innerWidth - centerRectRef.current.right + (width - (state?.width ?? 0))}px`);
 				document.documentElement.style.setProperty("--dsh-sidebar-width", `${width}px`);
 				document.documentElement.style.setProperty("--dsh-sidebar-height", `${height}px`);
 				if (cornerRef.current !== null) {
@@ -7462,8 +7469,8 @@ window.__ModuleLoader__.load({
 					className: clsx(sidebar_module_css_default.bottomPanel, !state.bottomOpen && sidebar_module_css_default.bottomPanelHidden),
 					style: {
 						height: Math.min(state.bottomHeight, window.innerHeight),
-						left: centerRect.left,
-						right: window.innerWidth - centerRect.right,
+						left: "var(--dsh-center-left, 0px)",
+						right: "var(--dsh-center-right, 0px)",
 						borderRight: state.panelOpen ? "1px solid var(--dsw-alias-border-l2)" : void 0
 					},
 					"data-dragging": draggingBottom || draggingCorner || void 0,

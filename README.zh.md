@@ -87,6 +87,68 @@ build-desktop.bat
 
 ## 近期变更
 
+### 侧边栏开关不再逐帧重渲染工作台
+
+- 修改目标：右侧侧边栏展开或折叠时，对话内容因每个动画帧都触发整棵
+  Sidebar 重新渲染而出现位移掉帧。
+- 修改文件：third_party/dsh-better-sidebar/src/client/Sidebar.tsx、
+  third_party/dsh-better-sidebar/lib/client.js、README.md、README.zh.md。
+- 修改内容：中心列边界测量结果改为直接写入 CSS 自定义属性，不再在
+  `ResizeObserver` 每帧回调中调用 `setState`，React 不再逐帧重新渲染
+  整个 Sidebar。
+- 影响范围：面板滑动和对话内容让位动画保持不变；侧边栏展开与折叠期间
+  工作台状态更新不再与 CSS 布局过渡竞争，动画更顺滑。
+- 注意事项：需重新构建 web bundle 和桌面安装器后生效。
+
+### 安装器文件解压改为后台线程执行
+
+- 修改目标：安装步骤解压 payload 并写入文件时，安装窗口暂时无法响应和拖动。
+- 修改文件：apps/desktop-installer/src-tauri/src/installer.rs、README.md、
+  README.zh.md。
+- 修改内容：`install` 改为异步 Tauri 命令，并通过
+  `tauri::async_runtime::spawn_blocking` 执行阻塞的安装工作。
+- 影响范围：文件解压、快捷方式创建和注册表写入不再阻塞安装器 UI 线程；
+  前端仍等待该命令完成后才进入下一步。
+- 注意事项：修复后已从源码重新构建安装器 exe。
+
+### 安装器停止旧进程时不再闪现命令窗口
+
+- 修改目标：安装步骤执行 `taskkill` 停止旧版 DeepSeek Harness 时，会出现
+  一个短暂的黑色命令窗口。
+- 修改文件：apps/desktop-installer/src-tauri/src/installer.rs、README.md、
+  README.zh.md。
+- 修改内容：`kill_running_app` 使用 `CREATE_NO_WINDOW` 启动 `taskkill`；
+  强制结束进程树与等待行为保持不变。
+- 影响范围：第四步安装过程中不再闪现黑色控制台窗口。
+- 注意事项：修复后已从源码重新构建安装器 exe。
+
+### 安装器 Rust 构建补齐窗口管理器 trait 导入
+
+- 修改目标：重新构建安装器时，`src/lib.rs` 调用 `get_webview_window` 因缺少
+  `tauri::Manager` trait 导入而编译失败。
+- 修改文件：apps/desktop-installer/src-tauri/src/lib.rs、README.md、
+  README.zh.md。
+- 修改内容：在 `lib.rs` 增加 `use tauri::Manager;`；窗口显示逻辑保持不变。
+- 影响范围：`npm run build:setup` 可以完成 Cargo release 编译并生成
+  `dsh-desktop-installer.exe`；安装器启动和窗口兜底显示行为不变。
+- 注意事项：修复后已从源码重新构建安装器 exe。
+
+### 安装器窗口显示修复
+
+- 修改目标：隐藏启动的安装器双击后没有弹出页面，原因是前端 `show()` 调用被权限策略拒绝，且没有原生兜底显示窗口。
+- 修改文件：apps/desktop-installer/src-tauri/capabilities/default.json（新增 `core:window:allow-show`）、apps/desktop-installer/src-tauri/src/lib.rs（setup 线程在 1.5 秒后强制显示主窗口）、README.md、README.zh.md。
+- 修改内容：前端在 React 挂载后可以显示窗口；即使该调用失败，原生壳也会在 1.5 秒后显示窗口，安装器必定出现。
+- 影响范围：双击安装器一定会弹出安装页面；窗口仍保持隐藏启动，因此不会闪黑。
+- 注意事项：安装器 exe 已从源码重新构建。
+
+### 终端文字纯白与安装器隐藏启动
+
+- 修改目标：侧栏终端沿用了主题文字令牌，普通输出不是纯白；无边框安装器在 WebView 绘制前仍会闪一下黑色窗口。
+- 修改文件：third_party/dsh-better-sidebar/src/client/TerminalView.tsx 与 third_party/dsh-better-sidebar/lib/client-terminal.js（终端背景固定 `#111114`、前景固定 `#ffffff`）、apps/desktop-installer/src-tauri/tauri.conf.json（`visible: false`）、apps/desktop-installer/src/App.tsx（React 挂载后再显示窗口）、README.md、README.zh.md。
+- 修改内容：侧栏终端现在始终使用纯白文字和深色背景，不随主题变化；安装器启动时先隐藏窗口，直到首次 React 提交完成后再显示，WebView 启动阶段不会出现黑色窗口。
+- 影响范围：终端输出为可读的纯白文字；安装器启动无黑色闪烁。
+- 注意事项：桌面端 exe 与自定义安装器已从源码重新构建。
+
 ### 安装器启动不再闪黑窗口
 
 - 修改目标：无边框自定义安装器在 WebView 绘制深色安装界面之前，会短暂显示黑色窗口。
