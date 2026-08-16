@@ -107,9 +107,9 @@ build-desktop.bat
 
 - 修改目标：回滚原先按压缩文件的字节长度截断 zstd 会话日志，导致回滚后对话仍然保留；同时旧快照偏移可能记录在助手回复之后。
 - 修改文件：apps/desktop/src-tauri/Cargo.toml（新增 zstd 依赖）、apps/desktop/src-tauri/src/diff_server.rs（`restore_session_log_to_message`：解压 zstd 日志、定位用户消息 seq、截断到其 turn/start 之前并重新压缩）、README.md、README.zh.md。
-- 修改内容：消息回滚现在按会话日志中的精确回合边界回退，兼容普通 JSONL 与 `.zstd` 日志，不再依赖旧的 `.log-offset` 快照位置。
+- 修改内容：消息回滚现在按会话日志中的精确回合边界回退，兼容普通 JSONL 与 `.zstd` 日志，并按照项目期望的“每行一个带校验的 zstd 帧”格式重新编码，避免 “corrupt Zstandard session log” 导致 API 网关和工作区插件加载失败。
 - 影响范围：回滚后，后续回合和处理信息会消失，会话回到提问之前的状态。
-- 注意事项：桌面端 exe 与安装器需要重新构建。
+- 注意事项：之前被错误单帧编码写坏的日志已按逐行 zstd 帧格式修复；一个无法解码的会话日志已隔离到临时目录。桌面端 exe 与安装器需要重新构建。
 
 ### 回滚改为确认后立即执行，不再加载预览
 
