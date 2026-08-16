@@ -92,7 +92,7 @@ build-desktop.bat
 - 修改目标：预览步骤需要加载并计算所有可能恢复的文件，大型会话中仍然很慢；回滚应只确认后立即执行。
 - 修改文件：packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx（移除 `/code-review/rollback/preview` 请求、回滚点下拉、文件列表、diff 预览与说明文字；弹窗只对当前消息做确认，显示“正在回滚...”状态，并在桌面端原地重启服务）、packages/client/ui-sidebar-toggle/src/client/locales.ts（新增 `review.rollbackWorking` 文案）、packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx（新增回滚草稿全局设置入口）、packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx（不再请求预览；确认时固定 `scope=both`）、apps/desktop/src-tauri/src/diff_server.rs（新增两个覆盖索引与 `snapshot_restore_targets`，回滚本身只处理可能发生变化的文件）、README.md、README.zh.md。
 - 修改内容：点击回滚按钮只弹出简单的确认窗口，不再显示回滚点下拉、“并把原消息放回输入框”说明或文件 diff 列表。确认后立即调用 `/code-review/rollback`（`scope=both`）恢复代码和对话；请求期间弹窗显示“正在回滚...”，完成后把原消息放回输入框，并在桌面端原地重启 dsh 服务，WebView 自动重连重放会话，不再整页刷新。浏览器模式仍回退为整页刷新。
-- 影响范围：回滚更快且行为可预期，弹窗不再卡在预览加载状态，也不提供无关的回滚点选择。
+- 影响范围：回滚更快且行为可预期；会话回到被点击问题之前的节点，该节点之前的对话历史仍然保留，原问题回到输入框，弹窗不再卡在预览加载状态，也不提供无关的回滚点选择。
 - 注意事项：预览接口保留用于兼容，客户端不再调用。
 
 ### 回滚统一：代码和对话一起回滚，原消息回到输入框
