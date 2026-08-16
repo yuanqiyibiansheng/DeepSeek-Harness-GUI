@@ -71,13 +71,21 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
-### Rollback upgrade: checkpoint picker and scope selection
+### Rollback confirmation without preview
 
-- Goal: upgrade the per-message rollback into a full rewind experience like Reasonix/Claude Code: choose any saved per-turn checkpoint and restore code, conversation, or both.
-- Files: apps/desktop/src-tauri/src/diff_server.rs (new `/code-review/snapshots` endpoint; `scope` parameter on preview/rollback endpoints), packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx (checkpoint select + rollback scope radios), packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts, README.md, README.zh.md.
-- Changes: the rollback dialog now lists every saved per-turn checkpoint for the session (`回合 N · <message-id>`), so the user can roll back to any earlier point instead of only the current message. A scope radio group chooses `只回滚代码`, `只回滚对话`, or `代码和对话`; conversation-only rollback restores the session log without touching files. The desktop diff server accepts `scope=code|conversation|both` and reports the available snapshot list.
-- Impact: rollback is precise per turn and can be limited to code or conversation, matching the checkpoints/rewind model from DeepSeek-Reasonix.
-- Notes: snapshots remain local and git-free; the desktop exe and installer were rebuilt from source.
+- Goal: the preview step loaded and diffed every potentially restored file, which stayed slow on large sessions; rollback should confirm and execute immediately.
+- Files: packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx (removed the `/code-review/rollback/preview` request, checkpoint picker, file list, diff surface, and explanatory sentence; the dialog now confirms the clicked message directly, shows a working state, and restarts the desktop service in place), packages/client/ui-sidebar-toggle/src/client/locales.ts (`review.rollbackWorking` copy), packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx (global rollback draft setter), packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx (no preview request; confirm calls `scope=both`), apps/desktop/src-tauri/src/diff_server.rs (two covering indexes and `snapshot_restore_targets` so the rollback itself only touches files that can differ), README.md, README.zh.md.
+- Changes: clicking the undo button opens a simple confirmation dialog with cancel/rollback only; there is no checkpoint picker, no file diff list, and no "并把原消息放回输入框" sentence. While the rollback request runs, the dialog shows "正在回滚...". Confirm calls `/code-review/rollback` with `scope=both` for the clicked message, restores code and conversation, puts the original message back into the composer, then restarts the dsh service in place so the WebView reconnects and replays the session without a full page reload. Browser mode falls back to reload.
+- Impact: rollback is fast and predictable; the dialog no longer hangs on "正在读取预览...." and no longer offers unrelated checkpoint choices.
+- Notes: the preview endpoint remains available for compatibility but is no longer used by the client.
+
+### Rollback unified: code + conversation with original message restored
+
+- Goal: converge the checkpoint rollback to the dsh-TUI rewind behavior: selecting a saved user-message checkpoint restores code and conversation together, then puts the original message back into the input for editing and resending.
+- Files: packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx (removed rollback scope radios; always requests `scope=both`; reads the selected user message from the conversation snapshot and stores it as a pending draft before reload), packages/client/ui-sidebar-toggle/src/client/locales.ts (`review.rollbackBoth` copy), packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx (rollback stores the original draft and calls `scope=both`), packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx (restores the pending draft after reload), README.md, README.zh.md.
+- Changes: the rollback dialog no longer shows a checkpoint picker, a file preview, or the original-message explanation. Rolling back always restores the code snapshot and the conversation log up to just before the clicked user message, then refreshes the session with that message back in the composer. The pending draft is carried via `sessionStorage` (`dsh-rollback-draft:<sessionId>`), and the `useSession` read was moved to render time so the hook is not invoked from the async event handler.
+- Impact: rollback is precise per turn and matches dsh-TUI rewind semantics: code and conversation move together, and the original prompt can be edited and resent.
+- Notes: snapshots remain local and git-free; the desktop exe and installer need to be rebuilt from source.
 
 ### DeepSeek balance widget and task-completion notifications
 
