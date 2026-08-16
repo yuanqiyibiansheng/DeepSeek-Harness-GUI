@@ -2,8 +2,6 @@
 
 /** Simplified Chinese dictionary (the key-set source of truth). */
 export const zh = {
-  'review.title': '代码审阅',
-  'review.toggle': '代码审阅',
   'review.close': '关闭',
   'review.loading': '正在读取改动...',
   'review.noWorkspace': '当前会话没有工作区目录',
@@ -39,8 +37,6 @@ export type CodeReviewKey = keyof typeof zh
 
 /** English dictionary, checked complete against the zh key set. */
 export const en = {
-  'review.title': 'Code Review',
-  'review.toggle': 'Code Review',
   'review.close': 'Close',
   'review.loading': 'Loading changes...',
   'review.noWorkspace': 'This session has no workspace directory',

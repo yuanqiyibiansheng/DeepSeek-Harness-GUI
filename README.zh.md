@@ -87,6 +87,30 @@ build-desktop.bat
 
 ## 近期变更
 
+### 安装器启动不再闪黑窗口
+
+- 修改目标：无边框自定义安装器在 WebView 绘制深色安装界面之前，会短暂显示黑色窗口。
+- 修改文件：apps/desktop-installer/src-tauri/tauri.conf.json（窗口 `backgroundColor: #0f172a`）、apps/desktop-installer/index.html（body 内联背景色）、README.md、README.zh.md。
+- 修改内容：原生窗口启动时直接使用与安装界面一致的 `#0f172a` 深色表面，入口 HTML 也在 CSS 加载前绘制同色背景，启动闪烁与安装器配色一致，不再闪黑。
+- 影响范围：启动安装器不再出现黑色窗口闪烁。
+- 注意事项：安装器 exe 已从源码重新构建。
+
+### 右侧栏纯白背景与新建标签页菜单宽度修复
+
+- 修改目标：右侧栏工作台沿用了当前主题令牌，桌面客户端下面板背景变透明、文字不可读；新建标签页的 + 菜单又继承了 22px 触发按钮宽度，所有选项都被省略号截断。
+- 修改文件：packages/client/web/src/base.css（在 `[data-dsh-better-sidebar]` 作用域内固定白色 `--dsw-alias-*` 令牌）、packages/client/ui-primitives/src/Menu.tsx（portal 菜单对纯图标触发按钮保留 218px 标准最小宽度，并按计算宽度解析对齐）、README.md、README.zh.md。
+- 修改内容：右侧栏现在无论主题如何都使用纯白面板、深色可读文字与边框；新建标签页下拉框保持 218px 标准菜单宽度，不再缩成小 + 按钮的宽度，选项完整显示。
+- 影响范围：浅色与深色主题下，右侧栏内容和新建标签页菜单均可正常阅读。
+- 注意事项：桌面端 exe 与自定义安装器已从更新后的 web bundle 重新构建。
+
+### 移除代码审阅，内置 dsh-better-sidebar 右侧工作台
+
+- 修改目标：移除原有头部代码审阅抽屉，并按照 dsh_desktop 参考仓库的内置插件方式接入右侧工作台。
+- 修改文件：third_party/dsh-better-sidebar（内置 `dsh-better-sidebar` 0.12.2 插件源码、预编译 lib、LICENSE、README）、apps/cli/package.json 与 packages/bundle/web-app/package.json（file: 依赖）、packages/bundle/web-app/cordis.patch.yml（新增 `better-sidebar` 加载行）、packages/client/ui-sidebar-toggle（移除 `CodeReviewAction`、`DiffReviewSurface`、`diff-model`，保留消息回滚按钮）、README.md、README.zh.md。
+- 修改内容：桌面端 bundle 现在内置 VSCode 风格右侧工作台（资源管理器 / 编辑器 / 终端 / Git / 浏览器），来源为 [omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)（MIT）。会话头部“代码审阅”按钮、Ctrl+Alt+B 快捷键及其抽屉界面已移除；用户消息上的回滚按钮保持不变。
+- 影响范围：打开项目会话后右侧会出现独立的工作台侧栏，布局与标签按会话隔离；旧代码审阅抽屉不再显示。
+- 注意事项：插件以非 workspace 的 file: 依赖形式放在 `third_party/` 下，随桌面 bundle 携带其运行依赖，但不作为 dsh workspace 成员发布。桌面端 exe 与自定义安装器需要重新构建。
+
 ### 安装器默认安装到本地 Program Files
 
 - 修改目标：安装到云同步盘（例如 H:）时，部分插件目录可能只剩空占位，导致后端无法挂载 `/api`，所有功能都报 “Failed to fetch”。

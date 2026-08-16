@@ -97,6 +97,7 @@
     "@deepseek-ai/dsh-cordis-client-runner": "workspace:^",
     "@deepseek-ai/dsh-cordis-host-runner": "workspace:^",
     "@deepseek-ai/dsh-web-frontend": "workspace:^",
+    "dsh-better-sidebar": "file:../../../third_party/dsh-better-sidebar",
     "@deepseek-ai/dsh-host-frontend-static": "workspace:^",
     "@deepseek-ai/dsh-host-apiproxy": "workspace:^",
     "@deepseek-ai/dsh-host-directory-picker-auto": "workspace:^",

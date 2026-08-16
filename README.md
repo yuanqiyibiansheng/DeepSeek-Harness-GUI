@@ -71,6 +71,62 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Installer startup no longer flashes a black window
+
+- Goal: the frameless custom installer showed a black window for a moment
+  before the WebView painted its dark-blue setup UI.
+- Files: apps/desktop-installer/src-tauri/tauri.conf.json (window
+  `backgroundColor: #0f172a`), apps/desktop-installer/index.html (inline body
+  background), README.md, README.zh.md.
+- Changes: the native window starts with the same `#0f172a` surface the setup
+  UI uses, and the entry HTML paints the same color before CSS loads, so the
+  startup flash matches the installer instead of showing black.
+- Impact: launching the installer no longer flashes a black window.
+- Notes: the installer exe was rebuilt from source.
+
+### Right sidebar white surface and complete new-tab menu
+
+- Goal: the dsh-better-sidebar workbench inherited the active theme tokens, so
+  on the desktop client the panel background became transparent and its labels
+  were unreadable; the + menu also inherited the 22px trigger width and
+  ellipsized every option.
+- Files: packages/client/web/src/base.css (fixed white `--dsw-alias-*` tokens
+  scoped to `[data-dsh-better-sidebar]`), packages/client/ui-primitives/src/Menu.tsx
+  (portal menus keep a 218px minimum width for icon-only triggers and resolve
+  alignment from the computed width), README.md, README.zh.md.
+- Changes: the right sidebar now uses a solid white panel with dark readable
+  text and borders regardless of the active theme; the new-tab dropdown keeps
+  the standard menu width (218px) instead of collapsing to the width of the
+  small + button, so every option is fully visible.
+- Impact: sidebar content and the new-tab menu are readable in both light and
+  dark themes.
+- Notes: the desktop exe and custom installer were rebuilt from source with the
+  updated web bundle.
+
+### Replace code review with the dsh-better-sidebar workbench
+
+- Goal: remove the old header code-review drawer and bring in the right-side
+  workbench from the dsh_desktop reference, following its bundled-plugin
+  approach.
+- Files: third_party/dsh-better-sidebar (vendored `dsh-better-sidebar` 0.12.2
+  plugin: source, prebuilt lib, LICENSE, README), apps/cli/package.json and
+  packages/bundle/web-app/package.json (file: dependency), packages/bundle/web-app/cordis.patch.yml
+  (`better-sidebar` loader row), packages/client/ui-sidebar-toggle (removed
+  `CodeReviewAction`, `DiffReviewSurface`, and `diff-model`; kept the per-message
+  rollback action), README.md, README.zh.md.
+- Changes: the desktop bundle now ships the VSCode-style right sidebar workbench
+  (explorer / editor / terminal / Git / browser) from
+  [omdsh-dev/DSH-better-sidebar](https://github.com/omdsh-dev/DSH-better-sidebar)
+  (MIT). The session-header Code Review button, Ctrl+Alt+B shortcut, and their
+  drawer UI are removed; the conversation rollback button on user messages is
+  unchanged.
+- Impact: opening a project conversation shows the sidebar workbench on the
+  right, with per-session layout and tabs; the old code-review drawer no longer
+  appears.
+- Notes: the plugin is vendored under `third_party/` as a non-workspace file
+  dependency so pnpm bundles its runtime dependencies without publishing it as
+  a dsh workspace member. The desktop exe and custom installer must be rebuilt.
+
 ### Installer defaults to local Program Files
 
 - Goal: installing to a cloud-synced drive (e.g. H:) could leave plugin directories as empty placeholders, making the backend fail to mount `/api` and every feature return "Failed to fetch".

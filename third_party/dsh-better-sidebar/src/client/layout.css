@@ -1,0 +1,59 @@
+/**
+ * Layout push: when a panel is open it OCCUPIES the layout instead of
+ * floating over it — the app shell (#root, the AppFrame three-column grid)
+ * gives up space. Only the center column is flexible (1fr), so the right
+ * panel's width squeeze (margin-right on #root) lands exactly on the
+ * conversation output and the input bar, like a VSCode sidebar.
+ *
+ * The bottom panel squeezes ONLY the center column — it must not cover the
+ * app's own left sidebar or the right panel. DSH 0.1.x wraps slot hosts in
+ * [data-slot] containers, so the AppFrame grid lives one level deeper:
+ * #root > div[data-slot="root"] > div (the frame). Its grid items are
+ * (frame > div:nth-child(1..3)): sidebarCol, centerCol, detailsCol, so the
+ * vertical push lands on the center column alone. The fixed panels cover
+ * the vacated strips, which looks seamless because #root's background is
+ * the theme base.
+ *
+ * The sizes ride CSS variables updated by the Sidebar shell (0 while
+ * collapsed); expand/collapse animates both the margins and the panel
+ * slides on the same theme duration. Drags disable the transition so the
+ * layout tracks the pointer.
+ */
+#root {
+  margin-right: var(--dsh-sidebar-width, 0px);
+  transition: margin-right var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* The AppFrame's grid items are sidebarCol, centerCol, detailsCol (children
+   1-3 of #root > div[data-slot="root"] > div) — nth-child(2) is the center
+   column. A stretched grid item shrinks by its margins, so the conversation
+   content (output + input bar) lifts without touching the sidebars. */
+#root > div[data-slot="root"] > div > div:nth-child(2) {
+  margin-bottom: var(--dsh-sidebar-height, 0px);
+  transition: margin-bottom var(--ds-transition-duration-slow) var(--ds-ease-in-out);
+}
+
+/* When the sidebar is collapsed, the toggle cluster reclaims the top-right
+   corner. Push the DSH session header's right padding out so its right-aligned
+   utilities (the "Session log" download capsule) yield the corner instead of
+   hiding under the cluster. The header default right-pads 28px; the 2-button
+   cluster spans right 10→70px, so 78px clears it with an 8px gap. Anchor on
+   the header's slot host wrapper ([data-slot="conversation.session.header"])
+   rather than a positional path: DSH 0.1.x nests the header several levels
+   under the center column. The Sidebar shell toggles the body attribute with
+   the panel open state. */
+body[data-dsh-sidebar-collapsed] [data-slot="conversation.session.header"] > header {
+  padding-right: 78px;
+}
+
+body[data-dsh-sidebar-dragging] #root,
+body[data-dsh-sidebar-dragging] #root > div[data-slot="root"] > div > div:nth-child(2) {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root,
+  #root > div[data-slot="root"] > div > div:nth-child(2) {
+    transition: none;
+  }
+}

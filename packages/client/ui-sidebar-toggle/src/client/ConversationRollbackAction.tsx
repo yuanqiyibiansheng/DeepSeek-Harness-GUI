@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConversationSnapshot, UserMessageNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import type { DiffPayload } from './CodeReviewAction.tsx'
+import type { DiffPayload } from './diff-payload.ts'
 import css from './ConversationRollbackAction.module.css'
 
 /** Full props: standard user-action runtime share plus the code-review locale. */
