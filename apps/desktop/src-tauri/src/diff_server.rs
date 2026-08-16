@@ -322,15 +322,33 @@ fn read_session_log_bytes(log: &Path) -> Result<Vec<u8>, String> {
   }
 }
 
+fn compress_zstd_frame(bytes: &[u8]) -> Result<Vec<u8>, String> {
+  let mut encoder = zstd::stream::Encoder::new(Vec::new(), 0)
+    .map_err(|error| format!("cannot create zstd encoder: {error}"))?;
+  encoder.include_checksum(true)
+    .map_err(|error| format!("cannot enable zstd checksum: {error}"))?;
+  encoder.write_all(bytes)
+    .map_err(|error| format!("cannot write zstd frame: {error}"))?;
+  encoder.finish()
+    .map_err(|error| format!("cannot finish zstd frame: {error}"))
+}
+
 fn write_session_log_bytes(log: &Path, bytes: &[u8]) -> Result<(), String> {
-  let encoded = if log.extension().map(|ext| ext == "zstd").unwrap_or(false) {
-    zstd::stream::encode_all(std::io::Cursor::new(bytes), 0)
-      .map_err(|error| format!("cannot compress session log: {error}"))?
+  if log.extension().map(|ext| ext == "zstd").unwrap_or(false) {
+    let text = std::str::from_utf8(bytes)
+      .map_err(|_| "session log is not UTF-8".to_string())?;
+    let mut encoded = Vec::new();
+    for line in text.split_inclusive('\n') {
+      if !line.is_empty() {
+        encoded.extend(compress_zstd_frame(line.as_bytes())?);
+      }
+    }
+    std::fs::write(log, encoded)
+      .map_err(|error| format!("cannot write session log: {error}"))
   } else {
-    bytes.to_vec()
-  };
-  std::fs::write(log, encoded)
-    .map_err(|error| format!("cannot write session log: {error}"))
+    std::fs::write(log, bytes)
+      .map_err(|error| format!("cannot write session log: {error}"))
+  }
 }
 
 fn restore_session_log_to_message(_cwd: &str, session: &str, message_id: &str) -> Result<bool, String> {
@@ -371,6 +389,11 @@ fn restore_session_log(_cwd: &str, session: &str) -> Result<bool, String> {
   let Some(log) = find_session_log(session) else {
     return Ok(false);
   };
+  if log.extension().map(|ext| ext == "zstd").unwrap_or(false) {
+    // Full-session reset of a zstd log needs its original header frame; avoid
+    // writing an empty zstd stream that would corrupt the session store.
+    return Ok(false);
+  }
   write_session_log_bytes(&log, b"")?;
   Ok(true)
 }

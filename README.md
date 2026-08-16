@@ -90,10 +90,10 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 ### Rollback conversation log fix (zstd + exact turn boundary)
 
 - Goal: rollback was truncating the zstd-compressed session log at the compressed file length, so the conversation stayed visible after rollback; it also used a snapshot-time offset that could point after the assistant reply.
-- Files: apps/desktop/src-tauri/Cargo.toml (zstd dependency), apps/desktop/src-tauri/src/diff_server.rs (`restore_session_log_to_message`: decompress zstd logs, locate the user/message seq, rewind to just before its turn/start, recompress), README.md, README.zh.md.
-- Changes: message rollback now rewinds the session log to the exact turn boundary before the clicked question, works with both plain JSONL and `.zstd` logs, and no longer depends on the old `.log-offset` snapshot position.
+- Files: apps/desktop/src-tauri/Cargo.toml (zstd dependency), apps/desktop/src-tauri/src/diff_server.rs (`restore_session_log_to_message`: decompress zstd logs, locate the user/message seq, rewind to just before its turn/start, re-encode one checksummed zstd frame per JSONL line), README.md, README.zh.md.
+- Changes: message rollback now rewinds the session log to the exact turn boundary before the clicked question, works with both plain JSONL and `.zstd` logs, and re-encodes the log in the same concatenated-frame format the session store expects, so the API gateway and workspace plugin no longer fail with "corrupt Zstandard session log".
 - Impact: after rollback, later turns and processing info disappear and the conversation returns to the state before the question.
-- Notes: the desktop exe and installer need to be rebuilt.
+- Notes: existing logs written by the earlier single-frame encoder were repaired by re-encoding each JSONL line as its own checksummed zstd frame; one unrecoverable session log was quarantined to the temp directory. The desktop exe and installer need to be rebuilt.
 
 ### Rollback confirmation without preview
 
