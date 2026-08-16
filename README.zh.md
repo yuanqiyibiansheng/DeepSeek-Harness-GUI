@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### 安装器默认安装到本地 Program Files
+
+- 修改目标：安装到云同步盘（例如 H:）时，部分插件目录可能只剩空占位，导致后端无法挂载 `/api`，所有功能都报 “Failed to fetch”。
+- 修改文件：apps/desktop-installer/src-tauri/src/installer.rs（`get_default_install_path` 现在始终返回 `%ProgramFiles%\DeepSeek Harness`）、README.md、README.zh.md。
+- 修改内容：安装器不再默认沿用旧云盘安装路径；全新安装默认落在本地系统盘。
+- 影响范围：重新安装到本地盘后，bundle 文件会完整落盘，API 网关、会话、工作区和插件都能正常加载。
+- 注意事项：如果旧云盘安装仍被注册，运行新安装器并选择默认本地路径；安装前先关闭所有 DeepSeek Harness 进程。
+
 ### 安装器更新前自动关闭正在运行的客户端
 
 - 修改目标：覆盖安装时旧客户端仍在运行，旧进程还在读取被替换的资源，导致下次启动出现 “Failed to load plugins”。

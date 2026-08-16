@@ -38,25 +38,11 @@ pub fn get_app_version() -> String {
 
 #[tauri::command]
 pub fn get_default_install_path() -> String {
-  if let Some(existing) = existing_install_path() {
-    return existing;
-  }
   let program_files = std::env::var("ProgramFiles").unwrap_or_else(|_| "C:\\Program Files".into());
   Path::new(&program_files)
     .join(APP_NAME)
     .display()
     .to_string()
-}
-
-fn existing_install_path() -> Option<String> {
-  let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-  let key = hklm.open_subkey_with_flags(UNINSTALL_KEY, KEY_READ).ok()?;
-  let location: String = key.get_value("InstallLocation").ok()?;
-  if Path::new(&location).join(APP_EXE).exists() {
-    Some(location)
-  } else {
-    None
-  }
 }
 
 /// Stop any running DeepSeek Harness instance before overwriting its files.
