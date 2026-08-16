@@ -87,6 +87,22 @@ build-desktop.bat
 
 ## 近期变更
 
+### 安装器更新前自动关闭正在运行的客户端
+
+- 修改目标：覆盖安装时旧客户端仍在运行，旧进程还在读取被替换的资源，导致下次启动出现 “Failed to load plugins”。
+- 修改文件：apps/desktop-installer/src-tauri/src/installer.rs（`extract_payload` 前调用 `kill_running_app`）、README.md、README.zh.md。
+- 修改内容：自定义安装器在解压 payload 前执行 `taskkill /IM "DeepSeek Harness.exe" /T /F`，并短暂等待，确保旧 WebView 与后端不会继续读取被替换的 bundle 文件。
+- 影响范围：升级/重装后不再残留旧插件清单或缺失 bundle 脚本错误。
+- 注意事项：安装器现在会自动关闭正在运行的客户端；手动关闭后再安装同样安全。
+
+### 回滚会话日志修复（支持 zstd，并回到精确回合边界）
+
+- 修改目标：回滚原先按压缩文件的字节长度截断 zstd 会话日志，导致回滚后对话仍然保留；同时旧快照偏移可能记录在助手回复之后。
+- 修改文件：apps/desktop/src-tauri/Cargo.toml（新增 zstd 依赖）、apps/desktop/src-tauri/src/diff_server.rs（`restore_session_log_to_message`：解压 zstd 日志、定位用户消息 seq、截断到其 turn/start 之前并重新压缩）、README.md、README.zh.md。
+- 修改内容：消息回滚现在按会话日志中的精确回合边界回退，兼容普通 JSONL 与 `.zstd` 日志，不再依赖旧的 `.log-offset` 快照位置。
+- 影响范围：回滚后，后续回合和处理信息会消失，会话回到提问之前的状态。
+- 注意事项：桌面端 exe 与安装器需要重新构建。
+
 ### 回滚改为确认后立即执行，不再加载预览
 
 - 修改目标：预览步骤需要加载并计算所有可能恢复的文件，大型会话中仍然很慢；回滚应只确认后立即执行。

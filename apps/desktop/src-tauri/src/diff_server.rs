@@ -311,27 +311,68 @@ fn log_offset_file(cwd: &str, session: &str, order: i64) -> PathBuf {
   Path::new(cwd).join(".recode").join(format!("{}.{}.log-offset", sanitize_session(session), order))
 }
 
-fn restore_session_log_for_order(cwd: &str, session: &str, order: i64) -> Result<bool, String> {
-  let offset_file = log_offset_file(cwd, session, order);
-  if !offset_file.exists() {
-    return Ok(false);
+fn read_session_log_bytes(log: &Path) -> Result<Vec<u8>, String> {
+  let raw = std::fs::read(log)
+    .map_err(|error| format!("cannot read session log: {error}"))?;
+  if log.extension().map(|ext| ext == "zstd").unwrap_or(false) {
+    zstd::stream::decode_all(std::io::Cursor::new(raw))
+      .map_err(|error| format!("cannot decompress session log: {error}"))
+  } else {
+    Ok(raw)
   }
-  let text = std::fs::read_to_string(&offset_file)
-    .map_err(|error| format!("cannot read log offset: {error}"))?;
-  let offset: u64 = text.trim().parse()
-    .map_err(|_| "corrupt log offset".to_string())?;
+}
+
+fn write_session_log_bytes(log: &Path, bytes: &[u8]) -> Result<(), String> {
+  let encoded = if log.extension().map(|ext| ext == "zstd").unwrap_or(false) {
+    zstd::stream::encode_all(std::io::Cursor::new(bytes), 0)
+      .map_err(|error| format!("cannot compress session log: {error}"))?
+  } else {
+    bytes.to_vec()
+  };
+  std::fs::write(log, encoded)
+    .map_err(|error| format!("cannot write session log: {error}"))
+}
+
+fn restore_session_log_to_message(_cwd: &str, session: &str, message_id: &str) -> Result<bool, String> {
   let Some(log) = find_session_log(session) else {
     return Ok(false);
   };
-  let file = std::fs::OpenOptions::new().write(true).open(&log)
-    .map_err(|error| format!("cannot open session log: {error}"))?;
-  file.set_len(offset)
-    .map_err(|error| format!("cannot truncate session log: {error}"))?;
+  let text = String::from_utf8(read_session_log_bytes(&log)?)
+    .map_err(|_| "session log is not UTF-8".to_string())?;
+  let mut boundary = None;
+  let mut last_turn_start = None;
+  let mut offset = 0usize;
+  for line in text.split_inclusive('\n') {
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(line.trim_end()) {
+      let kind = value.get("type").and_then(|v| v.as_str());
+      let seq = value.get("seq").and_then(|v| v.as_u64());
+      if kind == Some("turn/start") {
+        last_turn_start = Some(offset);
+      }
+      if kind == Some("user/message") && seq.is_some() && seq.unwrap().to_string() == message_id {
+        boundary = Some(last_turn_start.unwrap_or(offset));
+        break;
+      }
+    }
+    offset += line.len();
+  }
+  let Some(boundary) = boundary else {
+    return Ok(false);
+  };
+  let mut truncated = text[..boundary].as_bytes().to_vec();
+  if !truncated.ends_with(b"\n") && !truncated.is_empty() {
+    truncated.push(b'\n');
+  }
+  write_session_log_bytes(&log, &truncated)?;
   Ok(true)
 }
 
-fn restore_session_log(cwd: &str, session: &str) -> Result<bool, String> {
-  restore_session_log_for_order(cwd, session, 0)
+fn restore_session_log(_cwd: &str, session: &str) -> Result<bool, String> {
+  let Some(log) = find_session_log(session) else {
+    return Ok(false);
+  };
+  write_session_log_bytes(&log, b"")?;
+  Ok(true)
 }
 
 
@@ -925,7 +966,7 @@ fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message
     result = restore_files(cwd, targets)?;
   }
   if scope != "code" {
-    result.log_restored = restore_session_log_for_order(cwd, session, target_order).unwrap_or(false);
+    result.log_restored = restore_session_log_to_message(cwd, session, message_id).unwrap_or(false);
   }
   Ok(result)
 }
