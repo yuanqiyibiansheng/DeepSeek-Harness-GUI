@@ -59,6 +59,14 @@ fn existing_install_path() -> Option<String> {
   }
 }
 
+/// Stop any running DeepSeek Harness instance before overwriting its files.
+fn kill_running_app() {
+  let _ = Command::new("taskkill")
+    .args(["/IM", APP_EXE, "/T", "/F"])
+    .output();
+  std::thread::sleep(std::time::Duration::from_millis(500));
+}
+
 #[tauri::command]
 pub fn check_disk_space(path: String) -> Result<u64, String> {
   let drive = path
@@ -108,6 +116,7 @@ pub fn get_resource_files() -> Result<Vec<FileEntry>, String> {
 pub fn install(target_dir: String, create_desktop_shortcut: bool) -> Result<(), String> {
   let target = PathBuf::from(&target_dir);
   fs::create_dir_all(&target).map_err(|e| e.to_string())?;
+  kill_running_app();
   extract_payload(&target)?;
   seed_user_skills(&target)?;
   register_uninstall(&target_dir)?;

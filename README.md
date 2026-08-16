@@ -71,6 +71,22 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Installer closes the running app before updating files
+
+- Goal: installing over a running DeepSeek Harness instance replaced resources while the old process still served them, causing "Failed to load plugins" after the next launch.
+- Files: apps/desktop-installer/src-tauri/src/installer.rs (`kill_running_app` before `extract_payload`), README.md, README.zh.md.
+- Changes: the custom installer now runs `taskkill /IM "DeepSeek Harness.exe" /T /F` before extracting the payload, then waits briefly so the old WebView and backend cannot serve stale or half-replaced bundle files.
+- Impact: update/reinstall no longer leaves a stale plugin manifest or missing bundle script error after launch.
+- Notes: the installer now stops the running client automatically; a manual close is still safe.
+
+### Rollback conversation log fix (zstd + exact turn boundary)
+
+- Goal: rollback was truncating the zstd-compressed session log at the compressed file length, so the conversation stayed visible after rollback; it also used a snapshot-time offset that could point after the assistant reply.
+- Files: apps/desktop/src-tauri/Cargo.toml (zstd dependency), apps/desktop/src-tauri/src/diff_server.rs (`restore_session_log_to_message`: decompress zstd logs, locate the user/message seq, rewind to just before its turn/start, recompress), README.md, README.zh.md.
+- Changes: message rollback now rewinds the session log to the exact turn boundary before the clicked question, works with both plain JSONL and `.zstd` logs, and no longer depends on the old `.log-offset` snapshot position.
+- Impact: after rollback, later turns and processing info disappear and the conversation returns to the state before the question.
+- Notes: the desktop exe and installer need to be rebuilt.
+
 ### Rollback confirmation without preview
 
 - Goal: the preview step loaded and diffed every potentially restored file, which stayed slow on large sessions; rollback should confirm and execute immediately.
