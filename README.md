@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### DeepSeek balance widget and task-completion notifications
+
+- Goal: add an inline balance/cost widget to the conversation stats bar and show a Windows system notification when an agent turn completes, following the Deepseek-Harness-EAC reference implementation.
+- Files: packages/client/ui-desktop-tools (new client plugin: balance dock + turn-end notification listener), packages/client/runtime/src/client/index.ts (new `session/turn-end` event), packages/bundle/web-app (package dependency and loader row), apps/desktop/src-tauri/src/lib.rs (`balance_query` / `notify_task_done` / `open_recharge` commands, notification plugin), apps/desktop/src-tauri/build.rs and apps/desktop/src-tauri/capabilities/default.json (command permissions), apps/desktop/src-tauri/Cargo.toml and apps/desktop/src-tauri/Cargo.lock (`tauri-plugin-notification`, `ureq`), tsconfig.client.json, pnpm-lock.yaml, README.md, README.zh.md.
+- Changes: the conversation stats bar now shows 「本轮 ¥X · 余额 ¥Y」, refreshes every 15 minutes, and clicking opens the DeepSeek top-up page in the default browser. Balance comes from `https://api.deepseek.com/user/balance` using `DEEPSEEK_API_KEY` or `$DSH_HOME/.credentials.yaml`; the price tier follows the active model in `settings.yaml`. When a live `turn/end` event arrives, the shell raises a Windows toast (`DeepSeek Harness 任务完成`), rate-limited to once per 30 seconds per session; clicking the installed app's toast returns to the window.
+- Impact: users can monitor per-turn cost and account balance without opening the website, and get completion notifications while the client is in the background.
+- Notes: the balance widget requires a configured DeepSeek API key; without a key it shows the cost estimate only. The desktop exe and custom installer were rebuilt from source.
+
 ### Revert OpenCode agent engine integration
 
 - Goal: remove the experimental Harness/OpenCode engine switch and the bundled OpenCode web runtime; the desktop client stays on the in-app DeepSeek Harness conversation UI.

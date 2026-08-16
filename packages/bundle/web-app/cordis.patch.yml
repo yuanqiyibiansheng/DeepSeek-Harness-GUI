@@ -257,6 +257,10 @@
     - id: ui-vision-enhancement
       name: '@deepseek-ai/dsh-client-ui-vision-enhancement'
 
+    # Desktop tools: balance/cost stats dock + Windows task-completion notifications.
+    - id: ui-desktop-tools
+      name: '@deepseek-ai/dsh-client-ui-desktop-tools'
+
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the two reference sources (ui-skill / ui-subagent).
     - id: ui-input-trigger

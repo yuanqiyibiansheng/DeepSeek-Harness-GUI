@@ -69,6 +69,7 @@
     { "path": "./packages/client/ui-pet" },
     { "path": "./packages/client/ui-plugin-marketplace" },
     { "path": "./packages/client/ui-vision-enhancement" },
+    { "path": "./packages/client/ui-desktop-tools" },
     { "path": "./packages/client/ui-project-memory" },
     { "path": "./packages/client/ui-conversation" },
     { "path": "./packages/client/ui-tool" },

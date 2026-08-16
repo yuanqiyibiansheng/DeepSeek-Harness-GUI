@@ -6,7 +6,13 @@ fn main() {
       // capabilities can grant them (allow-pet-control / allow-restart-service)
       // to remote-origin pages (main + pet windows load http://127.0.0.1:*).
       // Without an app manifest the commands are denied on remote origins.
-      .app_manifest(tauri_build::AppManifest::new().commands(&["pet_control", "restart_service"]))
+      .app_manifest(tauri_build::AppManifest::new().commands(&[
+        "pet_control",
+        "restart_service",
+        "balance_query",
+        "notify_task_done",
+        "open_recharge",
+      ]))
       .windows_attributes(
         tauri_build::WindowsAttributes::new().window_icon_path(icon),
       ),

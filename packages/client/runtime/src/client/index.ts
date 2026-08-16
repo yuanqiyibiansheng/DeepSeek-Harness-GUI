@@ -173,6 +173,13 @@ declare module '@deepseek-ai/cordis' {
      * @param event - session id and derived phase.
      */
     'session/activity'(event: import('./index.ts').SessionActivityEvent): void
+    /**
+     * A session's agent turn ended (the durable `turn/end` boundary). Desktop
+     * surfaces use this to raise task-completion notifications.
+     * @mode emit
+     * @param event - session id and turn number.
+     */
+    'session/turn-end'(event: import('./index.ts').SessionTurnEndEvent): void
   }
   interface Context {
     slots: import('./slots.ts').SlotRegistry
@@ -203,6 +210,12 @@ export interface SessionActivityEvent {
   phase: SessionActivityPhase
 }
 
+/** Payload of the `session/turn-end` event. */
+export interface SessionTurnEndEvent {
+  sessionId: SessionId
+  turn: number
+}
+
 /**
  * Derive the activity phase from one session event and emit it.
  * working = a tool is executing (agent modifying code etc.);
@@ -224,6 +237,10 @@ function emitSessionActivity(ctx: Context, envelope: { payload: unknown }): void
   else if (type === 'step/start' || type === 'turn/start' || type === 'assistant/message') phase = 'thinking'
   if (phase !== undefined) {
     ctx.emit('session/activity', { sessionId, phase } satisfies SessionActivityEvent)
+  }
+  if (type === 'turn/end') {
+    const data = (frame.event as { data?: { turn?: number } }).data
+    ctx.emit('session/turn-end', { sessionId, turn: data?.turn ?? 0 } satisfies SessionTurnEndEvent)
   }
 }
 
