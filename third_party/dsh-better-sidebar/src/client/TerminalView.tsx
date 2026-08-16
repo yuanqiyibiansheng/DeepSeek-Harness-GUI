@@ -61,8 +61,8 @@ const ANSI_LIGHT: Record<string, string> = {
 /** The xterm theme for the current scheme (surface from tokens, ANSI curated). */
 function xtermTheme(): ITheme {
   const dark = isDarkScheme()
-  const background = tokenValue('--dsw-alias-bg-base') || (dark ? '#111114' : '#ffffff')
-  const foreground = tokenValue('--dsw-alias-label-primary') || (dark ? '#e6e6e6' : '#1a1a1a')
+  const background = '#111114'
+  const foreground = '#ffffff'
   return {
     background,
     foreground,

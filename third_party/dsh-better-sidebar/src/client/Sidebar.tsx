@@ -370,7 +370,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
   // horizontal edges — including the animated margin-right push while the
   // right panel opens/closes; a frame that never appears keeps the initial
   // zero-size fallback (the panel renders at 0 width until measured).
-  const [centerRect, setCenterRect] = useState({ left: 0, right: 0 })
+  const centerRectRef = useRef({ left: 0, right: 0 })
   // Refs keep the measure step stable across renders and let it skip work
   // mid-drag: during a width/corner drag the layout push resizes the center
   // column every frame, and reacting (setCenterRect → re-render) would
@@ -383,13 +383,14 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     const col = centerColRef.current
     if (col === null) return
     const rect = col.getBoundingClientRect()
-    // The bottom panel only cares about the horizontal edges: a pure height
-    // change (the bottom panel itself opening/closing) must not re-render,
-    // so keep the previous object when left/right are unchanged.
-    setCenterRect(prev =>
-      prev.left === rect.left && prev.right === rect.right
-        ? prev
-        : { left: rect.left, right: rect.right })
+    const next = { left: rect.left, right: rect.right }
+    centerRectRef.current = next
+    // Write the edges through CSS variables. During the right panel's
+    // margin transition ResizeObserver fires every frame; putting the values
+    // in React state would re-render the whole workbench every frame.
+    const rootStyle = document.documentElement.style
+    rootStyle.setProperty('--dsh-center-left', `${next.left}px`)
+    rootStyle.setProperty('--dsh-center-right', `${window.innerWidth - next.right}px`)
   }, [])
   useEffect(() => {
     let disposed = false
@@ -433,6 +434,9 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
       observer?.disconnect()
       watcher.disconnect()
       centerColRef.current = null
+      const rootStyle = document.documentElement.style
+      rootStyle.removeProperty('--dsh-center-left')
+      rootStyle.removeProperty('--dsh-center-right')
     }
   }, [measureCenter])
 
@@ -511,7 +515,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     // width (innerWidth - state.width - detailsWidth), so this equals
     // `width + detailsWidth` — derived from the measured column, keeping the
     // drag write-only (no React re-render mid-drag).
-    bottomRef.current?.style.setProperty('right', `${(window.innerWidth - centerRect.right) + (width - (state?.width ?? 0))}px`)
+    bottomRef.current?.style.setProperty('right', `${(window.innerWidth - centerRectRef.current.right) + (width - (state?.width ?? 0))}px`)
     document.documentElement.style.setProperty('--dsh-sidebar-width', `${width}px`)
     document.documentElement.style.setProperty('--dsh-sidebar-height', `${height}px`)
     if (cornerRef.current !== null) {
@@ -843,13 +847,13 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
         className={clsx(css.bottomPanel, !state.bottomOpen && css.bottomPanelHidden)}
         style={{
           height: Math.min(state.bottomHeight, window.innerHeight),
-          left: centerRect.left,
+          left: 'var(--dsh-center-left, 0px)',
           // Direct from the center column's measured right edge: the bottom
           // panel spans ONLY the center column, ending exactly at the
           // details column's left edge (the details column sits between the
           // center and the right panel, and the right panel's margin-right
           // push is already baked into centerRect.right).
-          right: window.innerWidth - centerRect.right,
+          right: 'var(--dsh-center-right, 0px)',
           // The seam against the open right panel needs its own hairline
           // (the right panel's border-left alone is covered by this panel's
           // fill — without it the corner looks cut off).

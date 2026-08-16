@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useTranslation } from "react-i18next";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import TitleBar from "./components/TitleBar";
 import InstallerLayout from "./components/InstallerLayout";
 import StepIndicator from "./components/StepIndicator";
@@ -16,6 +17,10 @@ export default function App() {
   const [targetDir, setTargetDir] = useState("");
   const [dirValid, setDirValid] = useState(false);
   const [createDesktopShortcut, setCreateDesktopShortcut] = useState(true);
+
+  useEffect(() => {
+    void getCurrentWindow().show().catch(() => {});
+  }, []);
 
   const canNext = step === 1 || step === 2 || (step === 3 && dirValid);
   const nextLabel = step === 1 ? t("btn_next") : step === 3 ? t("btn_install") : undefined;
