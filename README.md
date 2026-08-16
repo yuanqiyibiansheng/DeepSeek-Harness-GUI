@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Rollback upgrade: checkpoint picker and scope selection
+
+- Goal: upgrade the per-message rollback into a full rewind experience like Reasonix/Claude Code: choose any saved per-turn checkpoint and restore code, conversation, or both.
+- Files: apps/desktop/src-tauri/src/diff_server.rs (new `/code-review/snapshots` endpoint; `scope` parameter on preview/rollback endpoints), packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx (checkpoint select + rollback scope radios), packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css, packages/client/ui-sidebar-toggle/src/client/locales.ts, README.md, README.zh.md.
+- Changes: the rollback dialog now lists every saved per-turn checkpoint for the session (`回合 N · <message-id>`), so the user can roll back to any earlier point instead of only the current message. A scope radio group chooses `只回滚代码`, `只回滚对话`, or `代码和对话`; conversation-only rollback restores the session log without touching files. The desktop diff server accepts `scope=code|conversation|both` and reports the available snapshot list.
+- Impact: rollback is precise per turn and can be limited to code or conversation, matching the checkpoints/rewind model from DeepSeek-Reasonix.
+- Notes: snapshots remain local and git-free; the desktop exe and installer were rebuilt from source.
+
 ### DeepSeek balance widget and task-completion notifications
 
 - Goal: add an inline balance/cost widget to the conversation stats bar and show a Windows system notification when an agent turn completes, following the Deepseek-Harness-EAC reference implementation.

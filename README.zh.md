@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### 回滚升级：回滚点选择与范围控制
+
+- 修改目标：把逐消息回滚升级为 Reasonix/Claude Code 风格的完整 rewind 体验：可选择任意已保存的回合回滚点，并选择只恢复代码、只恢复对话或两者一起。
+- 修改文件：apps/desktop/src-tauri/src/diff_server.rs（新增 `/code-review/snapshots` 接口；预览与回滚接口新增 `scope` 参数）、packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx（回滚点下拉与回滚范围单选）、packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css、packages/client/ui-sidebar-toggle/src/client/locales.ts、README.md、README.zh.md。
+- 修改内容：回滚弹窗现在会列出该会话所有已保存的回合回滚点（`回合 N · <message-id>`），用户可回滚到任意更早的回合，而不再局限于当前消息。新增范围单选：`只回滚代码`、`只回滚对话`、`代码和对话`；仅回滚对话时只恢复会话日志，不修改文件。桌面 diff server 支持 `scope=code|conversation|both`，并返回可用快照列表。
+- 影响范围：回滚按回合精确执行，并可按代码/对话范围控制，对齐 DeepSeek-Reasonix 的 checkpoints/rewind 模型。
+- 注意事项：快照仍然本地保存、不依赖 git；桌面端 exe 与自定义安装器已从源码重新构建。
+
 ### DeepSeek 余额小部件与任务完成通知
 
 - 修改目标：在对话底部统计栏内联显示「本轮 ¥X · 余额 ¥Y」，并在 agent 回合完成时弹出 Windows 系统通知，参考 Deepseek-Harness-EAC 的实现。
