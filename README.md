@@ -71,6 +71,14 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### Installer defaults to local Program Files
+
+- Goal: installing to a cloud-synced drive (e.g. H:) could leave plugin directories as empty placeholders, making the backend fail to mount `/api` and every feature return "Failed to fetch".
+- Files: apps/desktop-installer/src-tauri/src/installer.rs (`get_default_install_path` now always returns `%ProgramFiles%\DeepSeek Harness`), README.md, README.zh.md.
+- Changes: the custom installer no longer reuses a previous cloud-drive install path as the default; fresh installs land on the local system drive by default.
+- Impact: reinstall to a local drive materializes all bundle files, so the API gateway, sessions, workspaces, and plugins load normally.
+- Notes: if an old cloud-drive install is still registered, run the new installer and choose the default local path; close all DeepSeek Harness processes first.
+
 ### Installer closes the running app before updating files
 
 - Goal: installing over a running DeepSeek Harness instance replaced resources while the old process still served them, causing "Failed to load plugins" after the next launch.
