@@ -22,6 +22,7 @@ export const zh = {
   'review.notGitRepo': '当前目录不是 Git 仓库，无法显示改动',
   'review.rollbackPreview': '回滚预览',
   'review.rollbackLoading': '正在读取预览...',
+  'review.rollbackWorking': '正在回滚...',
   'review.rollbackFiles': '将恢复 {count} 个文件',
   'review.rollbackSkipped': '{count} 个文件无法恢复',
   'review.rollbackStateModified': '修改',
@@ -30,11 +31,7 @@ export const zh = {
   'review.rollbackNoDiff': '该文件将恢复到快照版本',
   'review.checkpoint': '回滚到',
   'review.checkpointTurn': '回合 {order}',
-  'review.scope': '回滚范围',
-  'review.scopeCode': '只回滚代码',
-  'review.scopeConversation': '只回滚对话',
-  'review.scopeBoth': '代码和对话',
-  'review.conversationOnly': '将只恢复对话记录，不修改代码文件。',
+  'review.rollbackBoth': '将回滚代码和对话。',
 } satisfies Record<string, string>
 
 /** The code-review namespace key union. */
@@ -62,6 +59,7 @@ export const en = {
   'review.notGitRepo': 'Current directory is not a Git repository; changes cannot be shown',
   'review.rollbackPreview': 'Rollback preview',
   'review.rollbackLoading': 'Loading preview...',
+  'review.rollbackWorking': 'Rolling back...',
   'review.rollbackFiles': '{count} file(s) will be restored',
   'review.rollbackSkipped': '{count} file(s) cannot be restored',
   'review.rollbackStateModified': 'modified',
@@ -70,9 +68,5 @@ export const en = {
   'review.rollbackNoDiff': 'This file will be restored to the snapshot version',
   'review.checkpoint': 'Roll back to',
   'review.checkpointTurn': 'Turn {order}',
-  'review.scope': 'Rollback scope',
-  'review.scopeCode': 'Code only',
-  'review.scopeConversation': 'Conversation only',
-  'review.scopeBoth': 'Code and conversation',
-  'review.conversationOnly': 'Only the conversation will be restored; code files are left untouched.',
+  'review.rollbackBoth': 'Code and conversation will be rolled back.',
 } satisfies Record<CodeReviewKey, string>

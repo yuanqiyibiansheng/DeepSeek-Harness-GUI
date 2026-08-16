@@ -1,6 +1,6 @@
 /** Local code-review diff server for the desktop shell. */
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read, Write};
@@ -8,7 +8,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -392,6 +392,8 @@ fn open_history(cwd: &str) -> Result<Connection, String> {
       PRIMARY KEY (session, message_id, path)
     );
     CREATE INDEX IF NOT EXISTS idx_message_snapshots_order ON message_snapshots(session, order_no);
+    CREATE INDEX IF NOT EXISTS idx_message_snapshots_session_order_path ON message_snapshots(session, order_no, path);
+    CREATE INDEX IF NOT EXISTS idx_message_snapshots_session_path_order ON message_snapshots(session, path, order_no);
     CREATE TABLE IF NOT EXISTS file_meta (
       session TEXT NOT NULL,
       path TEXT NOT NULL,
@@ -635,6 +637,84 @@ fn list_message_snapshots(conn: &Connection, session: &str) -> Result<Vec<serde_
   Ok(items)
 }
 
+/** Read the latest mtime the snapshot layer recorded for every tracked path. */
+fn file_meta_map(conn: &Connection, session: &str) -> Result<HashMap<String, String>, String> {
+  let mut stmt = conn.prepare(r#"SELECT path, mtime FROM file_meta WHERE session = ?1"#)
+    .map_err(|error| format!("cannot prepare meta query: {error}"))?;
+  let rows = stmt.query_map(params![session], |row| {
+    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+  }).map_err(|error| format!("cannot query meta: {error}"))?;
+  let mut meta = HashMap::new();
+  for row in rows {
+    let (path, mtime) = row.map_err(|error| format!("cannot read meta row: {error}"))?;
+    meta.insert(path, mtime);
+  }
+  Ok(meta)
+}
+
+/** Paths with any snapshot row after a target order (covered by the order index). */
+fn changed_paths_after(conn: &Connection, session: &str, order: i64) -> Result<Vec<String>, String> {
+  let mut stmt = conn.prepare(
+    r#"SELECT DISTINCT path FROM message_snapshots
+       WHERE session = ?1 AND order_no > ?2 ORDER BY path"#,
+  ).map_err(|error| format!("cannot prepare changed-paths query: {error}"))?;
+  let rows = stmt.query_map(params![session, order], |row| row.get::<_, String>(0))
+    .map_err(|error| format!("cannot query changed paths: {error}"))?;
+  let mut paths = Vec::new();
+  for row in rows {
+    paths.push(row.map_err(|error| format!("cannot read changed path: {error}"))?);
+  }
+  Ok(paths)
+}
+
+/** Content of one path at the newest snapshot at or before `max_order`. */
+fn latest_content_at(
+  stmt: &mut rusqlite::Statement<'_>,
+  session: &str,
+  path: &str,
+  max_order: i64,
+) -> Result<Option<String>, String> {
+  stmt.query_row(
+    params![session, path, max_order],
+    |row| row.get(0),
+  ).optional().map_err(|error| format!("cannot read snapshot content: {error}"))
+}
+
+/**
+ * Only the snapshot paths that can differ from the target state: paths with
+ * rows after the target order, plus tracked paths whose current mtime moved
+ * since the last snapshot. Every other path is already at its target content.
+ */
+fn snapshot_restore_targets(
+  conn: &Connection,
+  cwd: &str,
+  session: &str,
+  target_order: i64,
+) -> Result<HashMap<String, Option<String>>, String> {
+  let meta = file_meta_map(conn, session)?;
+  let changed = changed_paths_after(conn, session, target_order)?;
+  let mut paths: HashSet<String> = changed.into_iter().collect();
+  for (path, recorded) in &meta {
+    let current = std::fs::metadata(Path::new(cwd).join(path)).ok()
+      .and_then(|m| m.modified().ok())
+      .map(|t| t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis().to_string()).unwrap_or_default());
+    if current.as_ref() != Some(recorded) {
+      paths.insert(path.clone());
+    }
+  }
+  let mut target_stmt = conn.prepare(
+    r#"SELECT content FROM message_snapshots
+       WHERE session = ?1 AND path = ?2 AND order_no <= ?3
+       ORDER BY order_no DESC LIMIT 1"#,
+  ).map_err(|error| format!("cannot prepare target query: {error}"))?;
+  let mut targets = HashMap::new();
+  for path in paths {
+    let content = latest_content_at(&mut target_stmt, session, &path, target_order)?;
+    targets.insert(path, content);
+  }
+  Ok(targets)
+}
+
 fn create_message_snapshot(conn: &Connection, cwd: &str, session: &str, message_id: &str) -> Result<i64, String> {
   let existing: i64 = conn.query_row(
     r#"SELECT COUNT(*) FROM message_snapshots WHERE session = ?1 AND message_id = ?2"#,
@@ -830,22 +910,9 @@ fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message
       targets.insert(path, content);
     }
   } else {
-    // Differential snapshots: each path's LATEST record at or before the
-    // target order is that file's content at the target moment (the first
-    // snapshot is the full session baseline).
-    let mut stmt = conn.prepare(
-      r#"SELECT s.path, s.content FROM message_snapshots s
-         WHERE s.session = ?1 AND s.order_no <= ?2
-           AND s.order_no = (SELECT MAX(order_no) FROM message_snapshots
-                             WHERE session = ?1 AND order_no <= ?2 AND path = s.path)"#,
-    ).map_err(|error| format!("cannot prepare message snapshot query: {error}"))?;
-    let rows = stmt.query_map(params![session, target_order], |row| {
-      Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
-    }).map_err(|error| format!("cannot query message snapshot: {error}"))?;
-    for row in rows {
-      let (path, content) = row.map_err(|error| format!("cannot read message snapshot row: {error}"))?;
-      targets.insert(path, content);
-    }
+    // Only paths that can differ from the target state need restoring; every
+    // other tracked path is already at its target content.
+    targets = snapshot_restore_targets(conn, cwd, session, target_order)?;
   }
 
   let mut result = RollbackResult {
@@ -892,71 +959,65 @@ fn preview_message_rollback(cwd: &str, session: &str, message_id: &str, scope: &
     }).to_string());
   };
   let mut files: Vec<serde_json::Value> = Vec::new();
-  let mut skipped: Vec<String> = Vec::new();
+  let skipped: Vec<String> = Vec::new();
   let mut total_additions = 0usize;
   let mut total_deletions = 0usize;
 
-  let mut snapshot_paths: Vec<String> = Vec::new();
-  {
-    // Differential snapshots: the LATEST record per path at or before the
-    // target order is that file's content at the target moment.
-    let mut stmt = conn.prepare(
-      r#"SELECT s.path, s.content FROM message_snapshots s
-         WHERE s.session = ?1 AND s.order_no <= ?2
-           AND s.order_no = (SELECT MAX(order_no) FROM message_snapshots
-                             WHERE session = ?1 AND order_no <= ?2 AND path = s.path)
-         ORDER BY s.path"#,
-    ).map_err(|error| format!("cannot prepare preview query: {error}"))?;
-    let rows = stmt.query_map(params![session, order], |row| {
-      Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?))
-    }).map_err(|error| format!("cannot query preview: {error}"))?;
-    for row in rows {
-      let (path, content) = row.map_err(|error| format!("cannot read preview row: {error}"))?;
-      snapshot_paths.push(path.clone());
-      let full = Path::new(cwd).join(&path);
-      let current = read_text_file(&full);
-      let current_missing = !full.exists();
-      match (content, current) {
-        (Some(old), Some(new)) => {
-          if old != new {
-            let (diff, added, deleted) = line_diff(&old, &new, &path);
-            if !diff.is_empty() {
-              files.push(serde_json::json!({
-                "path": path, "state": "modified",
-                "additions": added, "deletions": deleted, "diff": diff,
-              }));
-              total_additions += added;
-              total_deletions += deleted;
-            }
-          }
-        }
-        (Some(old), None) => {
-          if current_missing {
-            let (diff, _, deleted) = line_diff(&old, "", &path);
-            files.push(serde_json::json!({
-              "path": path, "state": "deleted",
-              "additions": 0, "deletions": deleted, "diff": diff,
-            }));
-            total_deletions += deleted;
-          } else {
-            // The snapshot has text but the current file is binary or
-            // unreadable: it WILL be restored (written back from the
-            // snapshot), so list it without a diff rather than skip it.
+  let targets = snapshot_restore_targets(&conn, cwd, session, order)?;
+  let meta = file_meta_map(&conn, session)?;
+  let mut latest_stmt = conn.prepare(
+    r#"SELECT content FROM message_snapshots
+       WHERE session = ?1 AND path = ?2 AND order_no <= ?3
+       ORDER BY order_no DESC LIMIT 1"#,
+  ).map_err(|error| format!("cannot prepare current-content query: {error}"))?;
+  for (path, content) in targets {
+    let full = Path::new(cwd).join(&path);
+    let current_mtime = std::fs::metadata(&full).ok()
+      .and_then(|m| m.modified().ok())
+      .map(|t| t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis().to_string()).unwrap_or_default());
+    let current = if meta.get(&path) == current_mtime.as_ref() {
+      latest_content_at(&mut latest_stmt, session, &path, i64::MAX)?
+    } else {
+      read_text_file(&full)
+    };
+    let current_missing = !full.exists();
+    match (content, current) {
+      (Some(old), Some(new)) => {
+        if old != new {
+          let (diff, added, deleted) = line_diff(&old, &new, &path);
+          if !diff.is_empty() {
             files.push(serde_json::json!({
               "path": path, "state": "modified",
-              "additions": 0, "deletions": 0, "diff": "",
-              "note": "current content is binary or unreadable; will be restored from snapshot",
+              "additions": added, "deletions": deleted, "diff": diff,
             }));
+            total_additions += added;
+            total_deletions += deleted;
           }
         }
-        (None, Some(_new)) => {
+      }
+      (Some(old), None) => {
+        if current_missing {
+          let (diff, _, deleted) = line_diff(&old, "", &path);
           files.push(serde_json::json!({
-            "path": path, "state": "created",
+            "path": path, "state": "deleted",
+            "additions": 0, "deletions": deleted, "diff": diff,
+          }));
+          total_deletions += deleted;
+        } else {
+          files.push(serde_json::json!({
+            "path": path, "state": "modified",
             "additions": 0, "deletions": 0, "diff": "",
+            "note": "current content is binary or unreadable; will be restored from snapshot",
           }));
         }
-        (None, None) => {}
       }
+      (None, Some(_new)) => {
+        files.push(serde_json::json!({
+          "path": path, "state": "created",
+          "additions": 0, "deletions": 0, "diff": "",
+        }));
+      }
+      (None, None) => {}
     }
   }
 

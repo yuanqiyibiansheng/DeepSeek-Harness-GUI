@@ -87,13 +87,21 @@ build-desktop.bat
 
 ## 近期变更
 
-### 回滚升级：回滚点选择与范围控制
+### 回滚改为确认后立即执行，不再加载预览
 
-- 修改目标：把逐消息回滚升级为 Reasonix/Claude Code 风格的完整 rewind 体验：可选择任意已保存的回合回滚点，并选择只恢复代码、只恢复对话或两者一起。
-- 修改文件：apps/desktop/src-tauri/src/diff_server.rs（新增 `/code-review/snapshots` 接口；预览与回滚接口新增 `scope` 参数）、packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx（回滚点下拉与回滚范围单选）、packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.module.css、packages/client/ui-sidebar-toggle/src/client/locales.ts、README.md、README.zh.md。
-- 修改内容：回滚弹窗现在会列出该会话所有已保存的回合回滚点（`回合 N · <message-id>`），用户可回滚到任意更早的回合，而不再局限于当前消息。新增范围单选：`只回滚代码`、`只回滚对话`、`代码和对话`；仅回滚对话时只恢复会话日志，不修改文件。桌面 diff server 支持 `scope=code|conversation|both`，并返回可用快照列表。
-- 影响范围：回滚按回合精确执行，并可按代码/对话范围控制，对齐 DeepSeek-Reasonix 的 checkpoints/rewind 模型。
-- 注意事项：快照仍然本地保存、不依赖 git；桌面端 exe 与自定义安装器已从源码重新构建。
+- 修改目标：预览步骤需要加载并计算所有可能恢复的文件，大型会话中仍然很慢；回滚应只确认后立即执行。
+- 修改文件：packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx（移除 `/code-review/rollback/preview` 请求、回滚点下拉、文件列表、diff 预览与说明文字；弹窗只对当前消息做确认，显示“正在回滚...”状态，并在桌面端原地重启服务）、packages/client/ui-sidebar-toggle/src/client/locales.ts（新增 `review.rollbackWorking` 文案）、packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx（新增回滚草稿全局设置入口）、packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx（不再请求预览；确认时固定 `scope=both`）、apps/desktop/src-tauri/src/diff_server.rs（新增两个覆盖索引与 `snapshot_restore_targets`，回滚本身只处理可能发生变化的文件）、README.md、README.zh.md。
+- 修改内容：点击回滚按钮只弹出简单的确认窗口，不再显示回滚点下拉、“并把原消息放回输入框”说明或文件 diff 列表。确认后立即调用 `/code-review/rollback`（`scope=both`）恢复代码和对话；请求期间弹窗显示“正在回滚...”，完成后把原消息放回输入框，并在桌面端原地重启 dsh 服务，WebView 自动重连重放会话，不再整页刷新。浏览器模式仍回退为整页刷新。
+- 影响范围：回滚更快且行为可预期，弹窗不再卡在预览加载状态，也不提供无关的回滚点选择。
+- 注意事项：预览接口保留用于兼容，客户端不再调用。
+
+### 回滚统一：代码和对话一起回滚，原消息回到输入框
+
+- 修改目标：把回滚收敛为 dsh-TUI 的 rewind 行为：选择已保存的用户消息回滚点后，代码与对话一起恢复到该消息之前，并把原消息放回输入框供修改和重发。
+- 修改文件：packages/client/ui-sidebar-toggle/src/client/ConversationRollbackAction.tsx（删除回滚范围单选；固定请求 `scope=both`；从会话快照读取所选用户消息文本，并在刷新前写入待恢复草稿）、packages/client/ui-sidebar-toggle/src/client/locales.ts（新增 `review.rollbackBoth` 文案）、packages/client/ui-sidebar-toggle/tests/ConversationRollbackAction.client.spec.tsx（覆盖回滚后恢复原草稿与 `scope=both`）、packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx（页面刷新后恢复待处理草稿）、README.md、README.zh.md。
+- 修改内容：回滚弹窗不再显示回滚点下拉、文件预览或原消息说明。执行回滚时始终同时恢复文件快照与会话日志到被点击的用户消息之前，然后刷新会话并把该消息放回输入框。待恢复草稿通过 `sessionStorage`（`dsh-rollback-draft:<sessionId>`）传递；`useSession` 改为渲染阶段读取，避免在异步事件回调中调用 React hook。
+- 影响范围：回滚按回合精确执行，代码和对话保持一致，并具备 dsh-TUI 的 rewind 体验：原消息可编辑后重新发送。
+- 注意事项：快照仍然本地保存、不依赖 git；桌面端 exe 与自定义安装器需要从源码重新构建。
 
 ### DeepSeek 余额小部件与任务完成通知
 

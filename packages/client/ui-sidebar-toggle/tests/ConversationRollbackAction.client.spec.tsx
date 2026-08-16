@@ -23,11 +23,10 @@ function mount(fetchImpl: (url: string) => Promise<unknown>): () => void {
   const root = createRoot(container)
   const useSessions = (() => ({ byId: { 's1': { cwd: 'H:\\ws' } } })) as never
   act(() => {
-    // The action consumes only the members below; the rest of the runtime
-    // share is stubbed away through the createElement cast.
     root.render(createElement(ConversationRollbackAction as never, {
       sessionId: 's1',
       messageId: 'm1',
+      useSession: (() => 'original prompt') as never,
       useSessions,
       t: (key: string) => key,
     }))
@@ -39,75 +38,52 @@ function mount(fetchImpl: (url: string) => Promise<unknown>): () => void {
   }
 }
 
-const PREVIEW = {
-  ok: true,
-  files: [
-    { path: 'src/a.ts', state: 'modified', additions: 2, deletions: 1, diff: 'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,2 +1,3 @@\n-old\n+new\n+more\n' },
-    { path: 'src/b.ts', state: 'deleted', additions: 0, deletions: 3, diff: 'diff --git a/src/b.ts b/src/b.ts\n--- a/src/b.ts\n+++ b/src/b.ts\n@@ -1,3 +1,0 @@\n-gone\n-away\n-now\n' },
-  ],
-  skipped: ['assets/logo.bin: binary'],
-  totalAdditions: 2,
-  totalDeletions: 4,
-  restoreAvailable: true,
-}
-
 afterEach(() => {
   document.body.innerHTML = ''
+  sessionStorage.clear()
 })
 
 describe('ConversationRollbackAction', () => {
-  it('loads the preview and lists the files to restore before confirming', async () => {
+  it('opens the confirmation window without loading a rollback preview', async () => {
     const calls: string[] = []
     const cleanup = mount(async (url) => {
       calls.push(url)
-      if (url.includes('/rollback/preview')) return PREVIEW
       return { ok: true }
     })
-    // Let the readiness snapshot request settle, then click the undo button.
     await act(async () => { await Promise.resolve() })
     act(() => {
       document.querySelector('button')?.click()
     })
     await act(async () => { await Promise.resolve() })
-    expect(calls.some(url => url.includes('/rollback/preview'))).toBe(true)
-    const text = document.body.textContent ?? ''
-    expect(text).toContain('src/a.ts')
-    expect(text).toContain('src/b.ts')
-    expect(text).toContain('review.rollbackFiles')
-    expect(text).toContain('assets/logo.bin')
+    expect(calls.some(url => url.includes('/rollback/preview'))).toBe(false)
+    expect(document.body.textContent).toContain('review.rollbackTitle')
+    expect(document.body.textContent).toContain('review.rollbackCancel')
+    expect(document.body.textContent).toContain('review.rollbackAction')
+    expect(document.body.textContent).not.toContain('review.rollbackBoth')
     cleanup()
   })
 
-  it('shows the selected file diff and disables confirm on error', async () => {
-    let previewCalls = 0
+  it('rolls back code and conversation immediately and restores the original message draft', async () => {
+    const calls: string[] = []
     const cleanup = mount(async (url) => {
-      if (url.includes('/rollback/preview')) {
-        previewCalls += 1
-        return previewCalls === 1 ? PREVIEW : { ok: false, error: 'boom' }
-      }
+      calls.push(url)
       return { ok: true }
     })
+    const reload = vi.fn()
+    vi.stubGlobal('location', { reload })
     await act(async () => { await Promise.resolve() })
     act(() => {
       document.querySelector('button')?.click()
     })
     await act(async () => { await Promise.resolve() })
-    // The first file's diff rows render inside the preview surface.
-    expect(document.body.textContent).toContain('new')
-    cleanup()
-  })
-
-  it('keeps the confirm button disabled while the preview failed', async () => {
-    const cleanup = mount(async (url) => {
-      if (url.includes('/rollback/preview')) return { ok: false, error: 'boom' }
-      return { ok: true }
-    })
-    await act(async () => { await Promise.resolve() })
     act(() => {
-      document.querySelector('button')?.click()
+      queryByText(document.body, 'review.rollbackAction')?.click()
     })
     await act(async () => { await Promise.resolve() })
-    expect(queryByText(document.body, 'boom')).toBeTruthy()
+    expect(calls.some(url => url.includes('/code-review/rollback?') && url.includes('scope=both'))).toBe(true)
+    expect(calls.some(url => url.includes('/rollback/preview'))).toBe(false)
+    expect(sessionStorage.getItem('dsh-rollback-draft:s1')).toBe('original prompt')
+    expect(reload).toHaveBeenCalledTimes(1)
     cleanup()
   })
 })
