@@ -2,8 +2,8 @@
  * Conversation rollback action in the user message actions strip: an undo
  * button that first loads a rollback PREVIEW (the files the snapshot will
  * restore, with per-file diffs and +/- counts) and only then asks for
- * confirmation — the cc-haha rewind contract: see before you roll back, and
- * report what cannot be restored.
+ * confirmation. Supports choosing any saved per-turn checkpoint and rolling
+ * back code, conversation, or both.
  */
 import { useEffect, useState } from 'react'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -32,8 +32,19 @@ export interface RollbackPreview {
   totalAdditions?: number
   totalDeletions?: number
   restoreAvailable?: boolean
+  /** Present when only the session log will be restored. */
+  conversationOnly?: boolean
   error?: string
 }
+
+/** One saved per-turn checkpoint. */
+export interface RollbackCheckpoint {
+  messageId: string
+  orderNo: number
+}
+
+/** Rollback scope: code files, conversation log, or both. */
+export type RollbackScope = 'code' | 'conversation' | 'both'
 
 /** Full props: standard user-action runtime share plus the code-review locale. */
 export type ConversationRollbackActionProps =
@@ -60,6 +71,9 @@ export function ConversationRollbackAction({ sessionId, messageId, useSessions, 
   const [preview, setPreview] = useState<RollbackPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [selectedPath, setSelectedPath] = useState<string | null>(null)
+  const [snapshots, setSnapshots] = useState<RollbackCheckpoint[]>([])
+  const [selectedMessage, setSelectedMessage] = useState(messageId)
+  const [scope, setScope] = useState<RollbackScope>('both')
   const cwd = useSessions(state => state.byId[sessionId]?.cwd ?? '')
 
   useEffect(() => {
@@ -74,13 +88,38 @@ export function ConversationRollbackAction({ sessionId, messageId, useSessions, 
     return () => { cancelled = true }
   }, [cwd, sessionId, messageId])
 
-  const rollback = (): void => {
-    if (!ready || busy) return
-    setConfirmOpen(true)
+  const loadSnapshots = (): void => {
+    if (cwd === '') return
+    fetch(`http://127.0.0.1:3199/code-review/snapshots?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}`)
+      .then(response => response.json() as Promise<{ ok?: boolean; snapshots?: RollbackCheckpoint[] }>)
+      .then(json => {
+        if (json.ok === true && Array.isArray(json.snapshots)) {
+          setSnapshots(json.snapshots)
+        }
+      })
+      .catch(() => {})
+  }
+
+  const loadPreview = (message: string, targetScope: RollbackScope): void => {
+    if (cwd === '') return
+    if (targetScope === 'conversation') {
+      setPreview({
+        ok: true,
+        files: [],
+        skipped: [],
+        totalAdditions: 0,
+        totalDeletions: 0,
+        restoreAvailable: true,
+        conversationOnly: true,
+      })
+      setPreviewLoading(false)
+      setSelectedPath(null)
+      return
+    }
+    setPreviewLoading(true)
     setPreview(null)
     setSelectedPath(null)
-    setPreviewLoading(true)
-    fetch(`http://127.0.0.1:3199/code-review/rollback/preview?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(messageId)}`)
+    fetch(`http://127.0.0.1:3199/code-review/rollback/preview?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(message)}&scope=${encodeURIComponent(targetScope)}`)
       .then(response => response.json() as Promise<RollbackPreview>)
       .then(json => {
         setPreview(json)
@@ -92,12 +131,20 @@ export function ConversationRollbackAction({ sessionId, messageId, useSessions, 
       .finally(() => { setPreviewLoading(false) })
   }
 
+  const rollback = (): void => {
+    if (!ready || busy) return
+    setConfirmOpen(true)
+    setSelectedMessage(messageId)
+    loadSnapshots()
+    loadPreview(messageId, scope)
+  }
+
   const performRollback = async (): Promise<void> => {
     if (busy) return
     setConfirmOpen(false)
     setBusy(true)
     try {
-      const response = await fetch(`http://127.0.0.1:3199/code-review/rollback?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(messageId)}`)
+      const response = await fetch(`http://127.0.0.1:3199/code-review/rollback?cwd=${encodeURIComponent(cwd)}&session=${encodeURIComponent(sessionId)}&message=${encodeURIComponent(selectedMessage)}&scope=${encodeURIComponent(scope)}`)
       const json = await response.json() as DiffPayload
       if (json.ok === true) {
         window.location.reload()
@@ -116,6 +163,9 @@ export function ConversationRollbackAction({ sessionId, messageId, useSessions, 
   const selectedRows = selected !== undefined && (selected.diff ?? '') !== ''
     ? (parseWorkspaceDiff(selected.diff ?? '')[0]?.rows ?? [])
     : []
+  const checkpoints = snapshots.length > 0
+    ? snapshots
+    : [{ messageId, orderNo: 1 }]
 
   return (
     <>
@@ -141,11 +191,54 @@ export function ConversationRollbackAction({ sessionId, messageId, useSessions, 
       >
         <div className={css.dialogBody}>
           <h2 className={css.dialogTitle}>{t('review.rollbackPreview')}</h2>
+          <label className={css.checkpointRow}>
+            <span className={css.checkpointLabel}>{t('review.checkpoint')}</span>
+            <select
+              className={css.checkpointSelect}
+              value={selectedMessage}
+              onChange={(event) => {
+                const next = event.target.value
+                setSelectedMessage(next)
+                loadPreview(next, scope)
+              }}
+            >
+              {checkpoints.map(checkpoint => (
+                <option key={checkpoint.messageId} value={checkpoint.messageId}>
+                  {t('review.checkpointTurn', { order: checkpoint.orderNo })} · {checkpoint.messageId.slice(0, 8)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className={css.scopeRow} role="radiogroup" aria-label={t('review.scope')}>
+            <span className={css.scopeLabel}>{t('review.scope')}</span>
+            {(['code', 'conversation', 'both'] as RollbackScope[]).map(value => (
+              <label key={value} className={scope === value ? `${css.scopeOption} ${css.scopeActive}` : css.scopeOption}>
+                <input
+                  type="radio"
+                  name="rollback-scope"
+                  value={value}
+                  checked={scope === value}
+                  onChange={() => {
+                    setScope(value)
+                    loadPreview(selectedMessage, value)
+                  }}
+                />
+                {t(value === 'code'
+                  ? 'review.scopeCode'
+                  : value === 'conversation'
+                    ? 'review.scopeConversation'
+                    : 'review.scopeBoth')}
+              </label>
+            ))}
+          </div>
           {previewLoading && <p className={css.dialogText}>{t('review.rollbackLoading')}</p>}
           {!previewLoading && preview?.ok !== true && (
             <p className={css.dialogError}>{preview?.error ?? t('review.rollbackFailed')}</p>
           )}
-          {!previewLoading && preview?.ok === true && (
+          {!previewLoading && preview?.ok === true && preview?.conversationOnly === true && (
+            <p className={css.dialogText}>{t('review.conversationOnly')}</p>
+          )}
+          {!previewLoading && preview?.ok === true && preview?.conversationOnly !== true && (
             <>
               <p className={css.dialogText}>
                 {t('review.rollbackFiles', { count: files.length })}

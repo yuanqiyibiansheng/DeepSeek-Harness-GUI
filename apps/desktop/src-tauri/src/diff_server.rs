@@ -80,6 +80,8 @@ fn handle(stream: TcpStream) -> std::io::Result<()> {
   }
   let session = percent_decode(query_param(query, "session"));
   let message = percent_decode(query_param(query, "message"));
+  let scope = percent_decode(query_param(query, "scope"));
+  let scope = if scope.is_empty() { "both".to_string() } else { scope };
 
   if target == "/code-review/snapshot" {
     if session.is_empty() {
@@ -131,11 +133,22 @@ fn handle(stream: TcpStream) -> std::io::Result<()> {
     );
   }
 
+  if target == "/code-review/snapshots" {
+    if session.is_empty() {
+      return write_response(stream, 400, r#"{"ok":false,"error":"session required"}"#);
+    }
+    let snapshots = open_history(&cwd)
+      .and_then(|conn| list_message_snapshots(&conn, &session))
+      .map(|items| serde_json::json!({ "ok": true, "snapshots": items }).to_string())
+      .unwrap_or_else(|error| serde_json::json!({ "ok": false, "error": error }).to_string());
+    return write_response(stream, 200, &snapshots);
+  }
+
   if target == "/code-review/rollback/preview" {
     if session.is_empty() || message.is_empty() {
       return write_response(stream, 400, r#"{"ok":false,"error":"session and message required"}"#);
     }
-    return match preview_message_rollback(&cwd, &session, &message) {
+    return match preview_message_rollback(&cwd, &session, &message, &scope) {
       Ok(body) => write_response(stream, 200, &body),
       Err(error) => write_response(
         stream,
@@ -150,9 +163,9 @@ fn handle(stream: TcpStream) -> std::io::Result<()> {
       return write_response(stream, 400, r#"{"ok":false,"error":"session required"}"#);
     }
     let rollback = if message.is_empty() {
-      open_history(&cwd).and_then(|conn| rollback_session(&conn, &cwd, &session))
+      open_history(&cwd).and_then(|conn| rollback_session(&conn, &cwd, &session, &scope))
     } else {
-      open_history(&cwd).and_then(|conn| rollback_message_session(&conn, &cwd, &session, &message))
+      open_history(&cwd).and_then(|conn| rollback_message_session(&conn, &cwd, &session, &message, &scope))
     };
     return match rollback {
       Ok(result) => {
@@ -568,7 +581,7 @@ struct RollbackResult {
   log_restored: bool,
 }
 
-fn rollback_session(conn: &Connection, cwd: &str, session: &str) -> Result<RollbackResult, String> {
+fn rollback_session(conn: &Connection, cwd: &str, session: &str, scope: &str) -> Result<RollbackResult, String> {
   let mut stmt = conn.prepare(
     r#"SELECT path, old_content FROM changes WHERE session = ?1 ORDER BY id ASC"#,
   ).map_err(|error| format!("cannot prepare rollback query: {error}"))?;
@@ -583,8 +596,18 @@ fn rollback_session(conn: &Connection, cwd: &str, session: &str) -> Result<Rollb
     }
   }
 
-  let mut result = restore_files(cwd, targets)?;
-  result.log_restored = restore_session_log(cwd, session).unwrap_or(false);
+  let mut result = RollbackResult {
+    restored: Vec::new(),
+    deleted: Vec::new(),
+    skipped: Vec::new(),
+    log_restored: false,
+  };
+  if scope != "conversation" {
+    result = restore_files(cwd, targets)?;
+  }
+  if scope != "code" {
+    result.log_restored = restore_session_log(cwd, session).unwrap_or(false);
+  }
   Ok(result)
 }
 
@@ -594,6 +617,22 @@ fn next_message_order(conn: &Connection, session: &str) -> Result<i64, String> {
     params![session],
     |row| row.get(0),
   ).map_err(|error| format!("cannot read message order: {error}"))
+}
+
+fn list_message_snapshots(conn: &Connection, session: &str) -> Result<Vec<serde_json::Value>, String> {
+  let mut stmt = conn.prepare(
+    r#"SELECT message_id, MIN(order_no) FROM message_snapshots
+       WHERE session = ?1 GROUP BY message_id ORDER BY MIN(order_no) ASC"#,
+  ).map_err(|error| format!("cannot prepare snapshots query: {error}"))?;
+  let rows = stmt.query_map(params![session], |row| {
+    Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
+  }).map_err(|error| format!("cannot query snapshots: {error}"))?;
+  let mut items = Vec::new();
+  for row in rows {
+    let (message_id, order_no) = row.map_err(|error| format!("cannot read snapshot row: {error}"))?;
+    items.push(serde_json::json!({ "messageId": message_id, "orderNo": order_no }));
+  }
+  Ok(items)
 }
 
 fn create_message_snapshot(conn: &Connection, cwd: &str, session: &str, message_id: &str) -> Result<i64, String> {
@@ -767,7 +806,7 @@ fn safe_target(cwd: &str, path: &str) -> Result<std::path::PathBuf, String> {
   Ok(candidate)
 }
 
-fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message_id: &str) -> Result<RollbackResult, String> {
+fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message_id: &str, scope: &str) -> Result<RollbackResult, String> {
   let order: i64 = conn.query_row(
     r#"SELECT MIN(order_no) FROM message_snapshots WHERE session = ?1 AND message_id = ?2"#,
     params![session, message_id],
@@ -809,8 +848,18 @@ fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message
     }
   }
 
-  let mut result = restore_files(cwd, targets)?;
-  result.log_restored = restore_session_log_for_order(cwd, session, target_order).unwrap_or(false);
+  let mut result = RollbackResult {
+    restored: Vec::new(),
+    deleted: Vec::new(),
+    skipped: Vec::new(),
+    log_restored: false,
+  };
+  if scope != "conversation" {
+    result = restore_files(cwd, targets)?;
+  }
+  if scope != "code" {
+    result.log_restored = restore_session_log_for_order(cwd, session, target_order).unwrap_or(false);
+  }
   Ok(result)
 }
 
@@ -822,7 +871,14 @@ fn rollback_message_session(conn: &Connection, cwd: &str, session: &str, message
  * preview contract: state is `modified` (content differs), `created` (absent
  * at snapshot time, will be deleted), or `deleted` (will be recreated).
  */
-fn preview_message_rollback(cwd: &str, session: &str, message_id: &str) -> Result<String, String> {
+fn preview_message_rollback(cwd: &str, session: &str, message_id: &str, scope: &str) -> Result<String, String> {
+  if scope == "conversation" {
+    return Ok(serde_json::json!({
+      "ok": true, "files": [], "skipped": [],
+      "totalAdditions": 0, "totalDeletions": 0, "restoreAvailable": true,
+      "conversationOnly": true,
+    }).to_string());
+  }
   let conn = open_history(cwd)?;
   let order: Option<i64> = conn.query_row(
     r#"SELECT MIN(order_no) FROM message_snapshots WHERE session = ?1 AND message_id = ?2"#,
@@ -1356,7 +1412,7 @@ mod tests {
     fs::write(cwd.join("src/b.txt"), "new").unwrap();
     let recorded = record_changes(&conn, &cwd_str, "s1").unwrap();
     assert_eq!(recorded, 2);
-    let result = rollback_session(&conn, &cwd_str, "s1").unwrap();
+    let result = rollback_session(&conn, &cwd_str, "s1", "both").unwrap();
     assert_eq!(fs::read_to_string(cwd.join("src/a.txt")).unwrap(), "one");
     assert!(!cwd.join("src/b.txt").exists());
     assert!(cwd.join("node_modules/skip.txt").exists());
@@ -1499,7 +1555,7 @@ mod tests {
     fs::write(cwd.join("src/a.txt"), "two").unwrap();
     fs::remove_file(cwd.join("src/keep.txt")).unwrap();
 
-    let body = preview_message_rollback(&cwd_str, "s3", "m1").unwrap();
+    let body = preview_message_rollback(&cwd_str, "s3", "m1", "both").unwrap();
     assert!(body.contains("\"state\":\"modified\""));
     assert!(body.contains("\"state\":\"deleted\""));
     // The diff rides inside JSON, so its newlines appear escaped (`\n`).
@@ -1509,5 +1565,41 @@ mod tests {
     assert!(body.contains("\"ok\":true"));
     let _ = fs::remove_dir_all(&cwd);
   }
-}
 
+  #[test]
+  fn rollback_scope_selects_code_or_conversation() {
+    let cwd = test_cwd("scope");
+    let cwd_str = cwd.to_string_lossy().into_owned();
+    fs::write(cwd.join("src/a.txt"), "one").unwrap();
+    let conn = open_history(&cwd_str).unwrap();
+    let _ = create_message_snapshot(&conn, &cwd_str, "s8", "m1").unwrap();
+    fs::write(cwd.join("src/a.txt"), "two").unwrap();
+
+    let code = rollback_message_session(&conn, &cwd_str, "s8", "m1", "code").unwrap();
+    assert_eq!(fs::read_to_string(cwd.join("src/a.txt")).unwrap(), "one");
+    assert_eq!(code.restored.len(), 1);
+    assert!(!code.log_restored);
+
+    fs::write(cwd.join("src/a.txt"), "two").unwrap();
+    let conv = rollback_message_session(&conn, &cwd_str, "s8", "m1", "conversation").unwrap();
+    assert_eq!(fs::read_to_string(cwd.join("src/a.txt")).unwrap(), "two");
+    assert_eq!(conv.restored.len(), 0);
+    let _ = fs::remove_dir_all(&cwd);
+  }
+
+  #[test]
+  fn list_message_snapshots_returns_ordered_checkpoints() {
+    let cwd = test_cwd("list");
+    let cwd_str = cwd.to_string_lossy().into_owned();
+    fs::write(cwd.join("src/a.txt"), "one").unwrap();
+    let conn = open_history(&cwd_str).unwrap();
+    let _ = create_message_snapshot(&conn, &cwd_str, "s9", "m1").unwrap();
+    fs::write(cwd.join("src/a.txt"), "two").unwrap();
+    let _ = create_message_snapshot(&conn, &cwd_str, "s9", "m2").unwrap();
+    let items = list_message_snapshots(&conn, "s9").unwrap();
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0]["orderNo"], 1);
+    assert_eq!(items[1]["orderNo"], 2);
+    let _ = fs::remove_dir_all(&cwd);
+  }
+}

@@ -28,6 +28,13 @@ export const zh = {
   'review.rollbackStateCreated': '新增',
   'review.rollbackStateDeleted': '删除',
   'review.rollbackNoDiff': '该文件将恢复到快照版本',
+  'review.checkpoint': '回滚到',
+  'review.checkpointTurn': '回合 {order}',
+  'review.scope': '回滚范围',
+  'review.scopeCode': '只回滚代码',
+  'review.scopeConversation': '只回滚对话',
+  'review.scopeBoth': '代码和对话',
+  'review.conversationOnly': '将只恢复对话记录，不修改代码文件。',
 } satisfies Record<string, string>
 
 /** The code-review namespace key union. */
@@ -61,4 +68,11 @@ export const en = {
   'review.rollbackStateCreated': 'created',
   'review.rollbackStateDeleted': 'deleted',
   'review.rollbackNoDiff': 'This file will be restored to the snapshot version',
+  'review.checkpoint': 'Roll back to',
+  'review.checkpointTurn': 'Turn {order}',
+  'review.scope': 'Rollback scope',
+  'review.scopeCode': 'Code only',
+  'review.scopeConversation': 'Conversation only',
+  'review.scopeBoth': 'Code and conversation',
+  'review.conversationOnly': 'Only the conversation will be restored; code files are left untouched.',
 } satisfies Record<CodeReviewKey, string>
