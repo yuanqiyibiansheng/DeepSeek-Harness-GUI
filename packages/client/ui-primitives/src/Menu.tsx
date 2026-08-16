@@ -56,6 +56,9 @@ function isLabel(entry: MenuEntry): entry is MenuLabel {
 /** Unplaced portal list: hidden but laid out at a fixed origin so offsetWidth/offsetHeight are real. */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
 
+/** Narrow icon-only triggers still get a readable standard menu width. */
+const MIN_PORTAL_WIDTH = 218
+
 /**
  * Render an anchored dropdown menu.
  * @param props.open - whether the list is showing (owner-controlled).
@@ -131,7 +134,7 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
       const vw = window.innerWidth
       const vh = window.innerHeight
       const listEl = listRef.current
-      const lw = listEl?.offsetWidth ?? 0
+      const lw = Math.max(listEl?.offsetWidth ?? 0, MIN_PORTAL_WIDTH)
       const lh = listEl?.offsetHeight ?? 0
 
       let x: number
@@ -152,8 +155,10 @@ export function Menu({ open, anchor, items, selectedId, selectedIds, onSelect, o
 
       // The portaled list matches the anchor's width (the NexBox-style
       // dropdown: the popup is as wide as its trigger), so placement anchors
-      // on the anchor's left edge and carries its width.
-      setFixedPos({ left: r.left, top: y, width: r.width })
+      // on the anchor's resolved edge and carries its width. Icon-only
+      // triggers (e.g. a 22px + button) keep the standard card width instead
+      // of collapsing to a sliver that ellipsizes every label.
+      setFixedPos({ left: x, top: y, width: Math.max(r.width, MIN_PORTAL_WIDTH) })
     }
     // First run measures the hidden pre-render (same commit as `open`), so
     // end/top alignment and clamping use real dimensions before anything

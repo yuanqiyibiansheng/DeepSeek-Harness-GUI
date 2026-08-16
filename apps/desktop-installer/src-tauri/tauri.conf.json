@@ -21,7 +21,8 @@
         "maxHeight": 500,
         "resizable": false,
         "center": true,
-        "decorations": false
+        "decorations": false,
+        "backgroundColor": "#0f172a"
       }
     ],
     "security": {

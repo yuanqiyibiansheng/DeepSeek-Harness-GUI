@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-sidebar-toggle",
-  "description": "Sidebar toggle plugin: session-header action and Ctrl+Alt+B shortcut",
+  "description": "Per-message conversation rollback action over the local desktop service",
   "version": "0.1.0-rc.5",
   "publishConfig": {
     "access": "public"

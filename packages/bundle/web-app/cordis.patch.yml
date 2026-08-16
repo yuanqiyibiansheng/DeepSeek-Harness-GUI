@@ -182,6 +182,10 @@
     - id: ui-sidebar-toggle
       name: '@deepseek-ai/dsh-client-ui-sidebar-toggle'
 
+    # VSCode-style right sidebar workbench: explorer / editor / terminal / Git /
+    # browser, isolated per conversation session (third-party bundle plugin).
+    - id: better-sidebar
+      name: 'dsh-better-sidebar'
 
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'

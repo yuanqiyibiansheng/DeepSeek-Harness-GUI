@@ -34,3 +34,23 @@ select,
 textarea {
   font-family: inherit;
 }
+
+/* Third-party dsh-better-sidebar workbench: keep the right panel readable
+   with a solid white surface and dark text regardless of the active theme. */
+[data-dsh-better-sidebar] {
+  --dsw-alias-bg-base: #ffffff;
+  --dsw-alias-bg-layer-2: #ffffff;
+  --dsw-alias-bg-layer-3: #ffffff;
+  --dsw-alias-bg-module-platform: #fafafa;
+  --dsw-alias-border-l2: #e5e7eb;
+  --dsw-alias-label-primary: #1f2328;
+  --dsw-alias-label-secondary: #374151;
+  --dsw-alias-label-tertiary: #6b7280;
+  --dsw-alias-label-caption: #6b7280;
+  --dsw-alias-interactive-bg-hover: #f3f4f6;
+  --dsw-alias-state-success-primary: #16a34a;
+  --dsw-alias-state-error-primary: #dc2626;
+  --dsw-alias-state-warn-label: #b45309;
+  --dsw-alias-interactive-focus: #2563eb;
+  --dsw-alias-state-info-primary: #2563eb;
+}
