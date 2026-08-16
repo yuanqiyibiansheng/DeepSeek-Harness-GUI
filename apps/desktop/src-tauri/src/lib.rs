@@ -6,6 +6,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewWindow, WindowEvent};
+use tauri_plugin_notification::NotificationExt;
 use url::Url;
 
 mod diff_server;
@@ -79,7 +80,14 @@ pub fn run() {
         let _ = window.unminimize();
       }
     }))
-    .invoke_handler(tauri::generate_handler![pet_control, restart_service])
+    .plugin(tauri_plugin_notification::init())
+    .invoke_handler(tauri::generate_handler![
+      pet_control,
+      restart_service,
+      balance_query,
+      notify_task_done,
+      open_recharge
+    ])
     .setup(|app| {
       app.manage(BackendState(Mutex::new(None)));
       if let Ok(data_dir) = app.path().app_data_dir() {
@@ -185,6 +193,157 @@ fn restart_service(app: AppHandle) -> Result<(), String> {
     }
   }
   spawn_backend(&app);
+  Ok(())
+}
+
+/// One DeepSeek account balance bucket, serialized for the web widget.
+#[derive(serde::Serialize)]
+struct BalanceInfo {
+  currency: String,
+  total: f64,
+  granted: f64,
+  topped_up: f64,
+}
+
+/// Serialized answer of the shell's `balance_query` command.
+#[derive(serde::Serialize)]
+struct BalanceResult {
+  ok: bool,
+  is_available: bool,
+  balances: Vec<BalanceInfo>,
+  prices: serde_json::Value,
+  error: String,
+}
+
+fn dsh_home_dir(app: &AppHandle) -> PathBuf {
+  app.path()
+    .app_data_dir()
+    .map(|dir| dir.join("dsh"))
+    .unwrap_or_else(|_| PathBuf::from("dsh"))
+}
+
+fn read_api_key(home: &Path) -> String {
+  if let Ok(key) = std::env::var("DEEPSEEK_API_KEY") {
+    let key = key.trim();
+    if !key.is_empty() { return key.to_string() }
+  }
+  let text = std::fs::read_to_string(home.join(".credentials.yaml")).unwrap_or_default();
+  for line in text.lines() {
+    let line = line.trim();
+    if let Some(rest) = line.strip_prefix("DEEPSEEK_API_KEY:") {
+      let key = rest.trim().trim_matches(|c| c == '"' || c == '\'').to_string();
+      if !key.is_empty() { return key }
+    }
+  }
+  String::new()
+}
+
+fn read_active_model(home: &Path) -> String {
+  let text = std::fs::read_to_string(home.join("settings.yaml")).unwrap_or_default();
+  for line in text.lines() {
+    let line = line.trim();
+    if let Some(rest) = line.strip_prefix("model:") {
+      if let Some(model) = rest.trim().split_whitespace().next() {
+        return model.to_string()
+      }
+    }
+  }
+  String::new()
+}
+
+fn active_prices(home: &Path) -> serde_json::Value {
+  let prices = match read_active_model(home).as_str() {
+    "deepseek-reasoner" | "deepseek-v4-pro" => (4.0, 1.0, 16.0),
+    _ => (2.0, 0.5, 8.0),
+  };
+  serde_json::json!({ "cacheMiss": prices.0, "cacheHit": prices.1, "output": prices.2 })
+}
+
+/// Query the DeepSeek account balance through the official API.
+#[tauri::command]
+fn balance_query(app: AppHandle) -> BalanceResult {
+  let home = dsh_home_dir(&app);
+  let key = read_api_key(&home);
+  if key.is_empty() {
+    return BalanceResult {
+      ok: false,
+      is_available: false,
+      balances: Vec::new(),
+      prices: active_prices(&home),
+      error: "no-key".to_string(),
+    }
+  }
+  let url = std::env::var("DEEPSEEK_BALANCE_URL").unwrap_or_else(|_| {
+    let base = std::env::var("DEEPSEEK_API_BASE")
+      .unwrap_or_else(|_| "https://api.deepseek.com".to_string());
+    format!("{}/user/balance", base.trim_end_matches('/'))
+  });
+  match ureq::get(&url)
+    .timeout(Duration::from_secs(15))
+    .set("Authorization", &format!("Bearer {key}"))
+    .set("User-Agent", "DSH-Desktop")
+    .call()
+  {
+    Ok(response) => {
+      let body = response.into_string().unwrap_or_default();
+      let json: serde_json::Value = serde_json::from_str(&body).unwrap_or(serde_json::Value::Null);
+      let balances = json.get("balance_infos")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|item| Some(BalanceInfo {
+          currency: item.get("currency")?.as_str()?.to_string(),
+          total: item.get("total_balance")?.as_f64()?,
+          granted: item.get("granted_balance")?.as_f64()?,
+          topped_up: item.get("topped_up_balance")?.as_f64()?,
+        }))
+        .collect();
+      BalanceResult {
+        ok: true,
+        is_available: json.get("is_available").and_then(|value| value.as_bool()).unwrap_or(false),
+        balances,
+        prices: active_prices(&home),
+        error: String::new(),
+      }
+    }
+    Err(error) => BalanceResult {
+      ok: false,
+      is_available: false,
+      balances: Vec::new(),
+      prices: active_prices(&home),
+      error: error.to_string(),
+    },
+  }
+}
+
+/// Show a Windows system notification for a completed agent turn.
+#[tauri::command]
+fn notify_task_done(app: AppHandle, title: String, body: String) -> Result<(), String> {
+  app.notification()
+    .builder()
+    .title(title)
+    .body(body)
+    .show()
+    .map_err(|error| error.to_string())
+}
+
+/// Open an external URL (the DeepSeek top-up page) in the default browser.
+#[tauri::command]
+fn open_recharge(url: String) -> Result<(), String> {
+  #[cfg(windows)]
+  {
+    use std::os::windows::process::CommandExt;
+    Command::new("cmd")
+      .args(["/C", "start", "", &url])
+      .creation_flags(0x08000000)
+      .spawn()
+      .map_err(|error| error.to_string())?;
+  }
+  #[cfg(not(windows))]
+  {
+    let _ = url;
+  }
   Ok(())
 }
 

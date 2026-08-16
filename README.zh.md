@@ -87,6 +87,14 @@ build-desktop.bat
 
 ## 近期变更
 
+### DeepSeek 余额小部件与任务完成通知
+
+- 修改目标：在对话底部统计栏内联显示「本轮 ¥X · 余额 ¥Y」，并在 agent 回合完成时弹出 Windows 系统通知，参考 Deepseek-Harness-EAC 的实现。
+- 修改文件：packages/client/ui-desktop-tools（新增客户端插件：余额小部件 + 回合结束通知监听）、packages/client/runtime/src/client/index.ts（新增 `session/turn-end` 事件）、packages/bundle/web-app（依赖与加载行）、apps/desktop/src-tauri/src/lib.rs（`balance_query` / `notify_task_done` / `open_recharge` 命令、通知插件）、apps/desktop/src-tauri/build.rs 与 apps/desktop/src-tauri/capabilities/default.json（命令权限）、apps/desktop/src-tauri/Cargo.toml 与 apps/desktop/src-tauri/Cargo.lock（`tauri-plugin-notification`、`ureq`）、tsconfig.client.json、pnpm-lock.yaml、README.md、README.zh.md。
+- 修改内容：对话统计栏新增「本轮 ¥X · 余额 ¥Y」小部件，每 15 分钟自动刷新，点击后使用默认浏览器打开 DeepSeek 充值页。余额来自 `https://api.deepseek.com/user/balance`，密钥读取 `DEEPSEEK_API_KEY` 或 `$DSH_HOME/.credentials.yaml`；价格档位按 `settings.yaml` 中的当前模型选择。实时 `turn/end` 事件到达时，桌面壳弹出 Windows 通知（`DeepSeek Harness 任务完成`），同一会话每 30 秒最多一条；点击已安装客户端的通知可回到窗口。
+- 影响范围：无需打开官网即可查看本轮费用与账户余额；客户端在后台时也能收到任务完成通知。
+- 注意事项：余额显示需要已配置 DeepSeek API Key；未配置时只显示费用估算。桌面端 exe 与自定义安装器已从源码重新构建。
+
 ### 撤销 OpenCode Agent 引擎接入
 
 - 修改目标：移除实验性的 Harness/OpenCode 引擎切换与内置 OpenCode Web 运行时，桌面客户端继续使用客户端内部的 DeepSeek Harness 对话界面。

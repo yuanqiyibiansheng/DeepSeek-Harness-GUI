@@ -6,5 +6,12 @@
   "remote": {
     "urls": ["http://127.0.0.1:*"]
   },
-  "permissions": ["core:default", "allow-pet-control", "allow-restart-service"]
+  "permissions": [
+    "core:default",
+    "allow-pet-control",
+    "allow-restart-service",
+    "allow-balance-query",
+    "allow-notify-task-done",
+    "allow-open-recharge"
+  ]
 }

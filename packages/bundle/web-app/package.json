@@ -81,6 +81,7 @@
     "@deepseek-ai/dsh-client-ui-plugin-marketplace": "workspace:^",
     "@deepseek-ai/dsh-client-ui-project-memory": "workspace:^",
     "@deepseek-ai/dsh-client-ui-vision-enhancement": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-desktop-tools": "workspace:^",
     "@deepseek-ai/dsh-terminal-host": "workspace:^",
     "@deepseek-ai/dsh-client-ui-skill": "workspace:^",
     "@deepseek-ai/dsh-client-ui-input-trigger": "workspace:^",
