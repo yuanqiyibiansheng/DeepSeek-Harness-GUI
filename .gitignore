@@ -47,3 +47,7 @@ _check_deps.ps1
 
 apps/desktop-installer/src-tauri/gen/
 apps/desktop-installer/src-tauri/uninstall.exe
+
+# Bundled portable Git runtime (project-memory git backing); not versioned
+Git/
+git-runtime/

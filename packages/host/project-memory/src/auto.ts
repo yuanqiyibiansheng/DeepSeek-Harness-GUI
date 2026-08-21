@@ -7,20 +7,64 @@
  */
 
 import { execFile, type ExecFileException } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { Session } from '@deepseek-ai/dsh-session'
 import { bundledMemorixCommand } from './patch.ts'
 
+/**
+ * Find the bundled portable Git's `mingw64\bin` on PATH so Memorix's own git
+ * calls resolve to a co-deployed git instead of a system install. Checks the
+ * harness bundle sibling of Memorix (deployed) and the project root (dev).
+ * @param cwd - the project directory Memorix resolves.
+ * @returns the git bin dir to prepend, or undefined when absent.
+ */
+function bundledGitBinDir(cwd: string): string | undefined {
+  const candidates = [
+    resolve(process.cwd(), 'Git', 'mingw64', 'bin'),
+    resolve(process.cwd(), '..', 'Git', 'mingw64', 'bin'),
+    resolve(cwd, 'Git', 'mingw64', 'bin'),
+  ]
+  return candidates.find((candidate) => existsSync(candidate))
+}
+
+/**
+ * Ensure a session's project directory is a git repo so Memorix can resolve it.
+ * Runs `git init` once when `.git` is absent; a repo already present is left
+ * untouched (git init on a repo is a harmless no-op anyway). Uses the bundled
+ * git when one is co-deployed, otherwise the system git.
+ * @param cwd - the project directory Memorix resolves.
+ */
+function ensureGitRepo(cwd: string): Promise<void> {
+  if (!cwd || existsSync(resolve(cwd, '.git'))) return Promise.resolve()
+  const gitBin = bundledGitBinDir(cwd)
+  const gitExe = gitBin === undefined ? 'git' : resolve(gitBin, 'git.exe')
+  return new Promise((resolve) => {
+    execFile(gitExe, ['init'], { cwd, timeout: 10_000 }, () => resolve())
+  })
+}
+
 /** Run one Memorix CLI command in the given project directory. */
-function runMemorix(cwd: string, args: string[]): Promise<string> {
+async function runMemorix(cwd: string, args: string[]): Promise<string> {
+  await ensureGitRepo(cwd)
   const bundled = bundledMemorixCommand()
   if (bundled === undefined) return Promise.resolve('')
   const cli = bundled.args[0]
   if (cli === undefined) return Promise.resolve('')
+  // Co-deployed portable Git: prepend its bin dir so Memorix shells out to it.
+  const gitBin = bundledGitBinDir(cwd)
+  const env = {
+    ...process.env,
+    // Let Memorix resolve the project by root path instead of a git parse that
+    // fails on dubious-ownership paths; store into the project's own memory.
+    MEMORIX_CLI_PROJECT_ROOT: cwd,
+    ...(gitBin === undefined ? {} : { PATH: `${gitBin};${process.env.PATH ?? ''}` }),
+  }
   return new Promise((resolve) => {
     execFile(
       bundled.command,
       [cli, ...args],
-      { cwd, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
+      { cwd, env, timeout: 20_000, maxBuffer: 8 * 1024 * 1024 },
       (error: ExecFileException | null, stdout: string) => {
         if (error) {
           process.stderr.write(`project-memory: memorix ${args.join(' ')} failed: ${String(error)}\n`)
@@ -114,7 +158,7 @@ export async function storeTurnMemory(session: Session, turn: number): Promise<v
  */
 export async function loadMemorySummary(cwd: string): Promise<string> {
   if (!cwd) return ''
-  const output = await runMemorix(cwd, ['memory', 'recent', '--limit', '5', '--json'])
+  const output = await runMemorix(cwd, ['memory', 'recent', '--limit', '10', '--json'])
   if (!output) return ''
   try {
     const parsed = JSON.parse(output) as { observations?: { title?: string; narrative?: string }[] }
@@ -122,7 +166,7 @@ export async function loadMemorySummary(cwd: string): Promise<string> {
     for (const item of parsed.observations ?? []) {
       const title = item.title?.trim()
       const narrative = item.narrative?.trim()
-      if (title) lines.push(`- ${title}${narrative ? `：${narrative.slice(0, 400)}` : ''}`)
+      if (title) lines.push(`- ${title}${narrative ? `：${narrative}` : ''}`)
     }
     return lines.length > 0 ? lines.join('\n') : ''
   } catch {

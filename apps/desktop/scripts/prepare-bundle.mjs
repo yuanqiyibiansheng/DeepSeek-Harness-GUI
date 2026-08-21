@@ -75,6 +75,7 @@ if (existsSync(nodeExe)) {
 }
 bundleNpm()
 bundleMemorix()
+bundleGit()
 console.log(`desktop bundle ready: ${bundleDir}`)
 
 /**
@@ -117,6 +118,31 @@ function bundleNpm() {
   if (!existsSync(join(npmDir, 'node_modules', 'npm', 'bin', 'npm-cli.js'))) {
     throw new Error('npm bundle incomplete: npm-cli.js missing after install')
   }
+}
+
+/**
+ * Bundle a portable Git beside the bundled node so project-memory (which is
+ * git-backed) works on machines without a system git install. The runtime is
+ * produced locally by the desktop build workflow (and ignored by git); the
+ * command fails loud when the copied runtime is incomplete. Falls back to the
+ * repo's `Git/` folder when the local runtime dir is absent.
+ */
+function bundleGit() {
+  const candidates = [join(desktopDir, 'git-runtime'), join(rootDir, 'Git')]
+  const source = candidates.find((dir) => existsSync(join(dir, 'mingw64', 'bin', 'git.exe')))
+  if (!source) {
+    console.log('git-runtime absent; skipping bundled git (project memory will use system git)')
+    return
+  }
+  const dest = join(bundleDir, 'Git')
+  if (existsSync(dest)) {
+    rmSync(dest, { recursive: true, force: true })
+  }
+  cpSync(source, dest, { recursive: true, force: true, dereference: false })
+  if (!existsSync(join(dest, 'mingw64', 'bin', 'git.exe'))) {
+    throw new Error('git bundle incomplete: mingw64/bin/git.exe missing')
+  }
+  console.log(`bundled git into ${dest}`)
 }
 
 function copyWorkspacePackages() {
