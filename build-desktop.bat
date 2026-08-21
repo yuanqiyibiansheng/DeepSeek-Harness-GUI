@@ -3,7 +3,7 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 set "ROOT=%~dp0"
 
-echo [1/6] Checking toolchain...
+echo [1/7] Checking toolchain...
 
 set "CODEX_NODE=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin"
 set "CODEX_PNPM=%USERPROFILE%\.cache\codex-runtimes\codex-primary-runtime\dependencies\bin\fallback"
@@ -44,7 +44,7 @@ call cargo --version
 
 echo.
 set "npm_config_confirm_modules_purge=false"
-echo [2/6] Installing project dependencies...
+echo [2/7] Installing project dependencies...
 call pnpm install
 if errorlevel 1 (
   echo ERROR: pnpm install failed.
@@ -52,7 +52,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [3/6] Building libraries and Web frontend...
+echo [3/7] Building libraries and Web frontend...
 call pnpm run build
 if errorlevel 1 (
   echo ERROR: dsh build failed.
@@ -60,7 +60,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo [4/6] Preparing embedded dsh bundle and Node runtime...
+echo [4/7] Preparing embedded dsh bundle and Node runtime...
 cd /d "%ROOT%apps\desktop"
 call pnpm run prepare:bundle
 if errorlevel 1 (
@@ -69,21 +69,33 @@ if errorlevel 1 (
 )
 
 echo.
-echo [5/6] Building Tauri desktop app...
-call .\node_modules\.bin\tauri.cmd build
+echo [5/7] Building desktop shell executable...
+call pnpm run build:no-bundle
 if errorlevel 1 (
-  echo ERROR: tauri build failed. Check the Rust toolchain and network access.
+  echo ERROR: desktop shell build failed.
   exit /b 1
 )
 
 echo.
-echo [6/6] Locating output...
-set "OUT_DIR=%ROOT%apps\desktop\src-tauri\target\release\bundle\nsis"
-if exist "%OUT_DIR%" (
-  for %%F in ("%OUT_DIR%\*.exe") do echo Installer: %%F
-) else (
-  echo Raw executable: %ROOT%apps\desktop\src-tauri\target\release\DeepSeek Harness.exe
+echo [6/7] Building desktop installer executable...
+set "BUNDLED_NODE=%ROOT%apps\desktop\bundle\node\node.exe"
+powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ^
+  "$target=[System.IO.Path]::GetFullPath($env:BUNDLED_NODE); $self=$PID; $victims=Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $self -and ($_.ExecutablePath -eq $target -or ($_.CommandLine -ne $null -and $_.CommandLine.Contains($target))) }; if($victims.Count -gt 0){ $names=($victims | ForEach-Object { ('{0}({1})' -f $_.Name, $_.ProcessId) }) -join ', '; Write-Host ('Stopping processes locking ' + $target + ': ' + $names); $victims | ForEach-Object { Stop-Process -Id $_.ProcessId -Force } }"
+if errorlevel 1 (
+  echo ERROR: failed to clear processes using %BUNDLED_NODE%.
+  exit /b 1
 )
+cd /d "%ROOT%apps\desktop-installer"
+call pnpm run build:setup
+if errorlevel 1 (
+  echo ERROR: desktop installer build failed. Check the Rust toolchain and network access.
+  exit /b 1
+)
+
+echo.
+echo [7/7] Locating outputs...
+echo Desktop shell executable: %ROOT%apps\desktop\src-tauri\target\release\dsh-desktop.exe
+echo Installer executable: %ROOT%apps\desktop-installer\src-tauri\target\release\dsh-desktop-installer.exe
 
 echo.
 echo Done.

@@ -22,4 +22,3 @@ tauri-plugin-notification = "2"
 url = "2"
 rusqlite = { version = "0.32", features = ["bundled"] }
 ureq = "2"
-zstd = "0.13"

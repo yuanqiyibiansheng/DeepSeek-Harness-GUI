@@ -339,6 +339,7 @@ describe('DetailsPanel diff Output section', () => {
           removeImage: () => {},
           pruneImages: () => {},
           submit: () => {},
+          resetForRewind: () => {},
         }}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}

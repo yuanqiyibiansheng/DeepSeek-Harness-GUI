@@ -120,6 +120,15 @@ class TestPersistence extends SessionPersistence {
       revision: SessionPersistenceRevision(`events:${entry.events.length}`),
     }))
   }
+
+  async trim(id: SessionIdType, cutoffSeq: number): Promise<{ removedCount: number }> {
+    const entry = TestPersistence.entries.get(id)
+    if (entry === undefined) return Promise.reject(new Error('missing test session'))
+    const kept = entry.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = entry.events.length - kept.length
+    TestPersistence.entries.set(id, { meta: entry.meta, events: kept })
+    return { removedCount }
+  }
 }
 
 async function liveContext(config: ConstructorParameters<typeof TestSessionQueryEngine>[1] = {}): Promise<Context> {

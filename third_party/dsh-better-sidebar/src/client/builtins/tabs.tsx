@@ -182,11 +182,12 @@ export function builtinTabs(ctx: Context): readonly TabDescriptor[] {
       },
       component: ({ tab, scope, store }) => <LazyTerminal scope={scope} store={store} tabId={tab.id} />,
     },
-    {
+      {
       id: 'browser',
       title: () => t('browser'),
       icon: (size: number) => <IconGlobeOutline16 size={size} />,
-      order: 50,
+      order: 40,
+
       // Declarative settings: the sandbox escape hatch, the link-takeover
       // MASTER switch, and the per-protocol takeover switches (http on /
       // https off by default) render under this tab's row in the Side card

@@ -71,6 +71,150 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 
 ## Recent changes
 
+### DeepSeek/pi-ai adapters default to text + image (all models accept images)
+
+- Goal: let any model accept image content by default so `read_image` and the image-upload preflight pass without per-model configuration; a genuinely text-only model fails at the API with its own 400 rather than being refused by the harness.
+- Files: packages/llm/llm-deepseek/src/adapter.ts, packages/llm/llm-deepseek/src/serialize.ts, packages/llm/llm-deepseek/src/index.ts, packages/llm/llm-deepseek/src/types.ts, packages/llm/llm-pi-ai/src/config.ts, packages/llm/llm-deepseek/tests/serialize.spec.ts, packages/llm/llm-deepseek/tests/adapter.spec.ts, packages/llm/llm-deepseek/tests/dynamic-config.spec.ts, packages/llm/llm-pi-ai/tests/catalog.spec.ts, packages/llm/llm-pi-ai/tests/config.spec.ts, README.md, README.zh.md, packages/llm/llm-deepseek/README.md, packages/llm/llm-deepseek/README.zh.md, packages/llm/llm-pi-ai/README.md.
+- Changes: `DeepSeekCatalogModel` gains an optional `inputModalities` field, and an undeclared model (a catalog entry or an unlisted pass-through id) now defaults to `[text, image]`; the serializer encodes a user-message image as an OpenAI-compatible `image_url` base64 data URL through the durable attachment store, and refuses images on wire roles that cannot carry them (system/assistant/tool) or when no store is mounted. pi-ai's `defaultInput` default becomes `[text, image]`. `resolveModelInfo`/`listModels` report the resolved modalities, which is what the `read_image` gate and the host upload preflight check.
+- Impact: any DeepSeek-official or pi-ai model without an explicit modality declaration is treated as image-capable, so `read_image` and image uploads work out of the box; a truly text-only model that receives an image fails at the provider with its own 400 after the image is sent.
+- Notes: this shifts image-capability enforcement from the harness preflight to the provider. An explicit declaration still wins: an entry declaring `[text]` (or a route's `defaultInput: [text]`) restores the conservative refusal-before-attach behavior. Images are supported only on user messages.
+
+### Automatic compaction no longer fails when a local model's output cap outgrows its context window
+
+- Goal: fix automatic pressure compaction silently failing when a pi-ai local model leaves `maxTokens` unset; pi-ai fills the gap with `32_768`, which can exceed a smaller hand-configured `contextWindow` and turn `promptBudget` negative, throwing an error the step listener swallows.
+- Files: packages/compaction/compaction-basic/src/config.ts, packages/compaction/compaction-basic/tests/compaction-basic.spec.ts, README.md, README.zh.md.
+- Changes: `resolveCompactSpec` now uses the whole context window as `promptBudget` when `maxTokens` is unset or already at least the context window, instead of throwing `TargetPressureConfigError`; added a unit test for the oversized-output fallback.
+- Impact: a local model whose reported output capability equals or exceeds its configured `contextWindow` now compacts at the normal 80% threshold rather than never compressing.
+- Notes: the threshold itself is unchanged; the pressure listener still only warns once per target before falling silent, which is a separate observability gap.
+
+### Web default composition now keeps automatic compaction on
+
+- Goal: make the shipped Web composition load `compaction-basic` by default instead of disabling it in the web-app patch.
+- Files: packages/bundle/web-app/cordis.patch.yml, apps/cli/tests/web-compaction-default.spec.ts, README.md.
+- Changes: changed the web-app bundle patch so `compaction-basic` is mounted with `auto: true`; added a config regression that checks the shipped web patch keeps `compaction-basic` enabled with automatic compaction on.
+- Impact: shipped Web/desktop sessions now keep automatic context compaction enabled by default, so the 80% pressure threshold can trigger compaction without an extra preset override.
+- Notes: this does not change the compaction threshold itself; it only restores the default shipped activation path that the web-app bundle had been disabling.
+
+### Blank sessions now drop stale context-meter projections
+
+- Goal: stop a brand-new session from inheriting stale context meter values and opening at 100% when the host still proves it is blank.
+- Files: packages/client/runtime/src/client/sessions/projection-store.ts, packages/client/runtime/src/client/sessions/session.ts, packages/client/runtime/tests/projection-store.client.spec.ts, packages/client/runtime/tests/session.client.spec.ts, README.md.
+- Changes: added an immediate `ProjectionValueStore.clear()` path and taught blank-session handling to clear stale `contextPressure`, `contextBreakdown`, `tokenUsage`, and `sessionStats` rows whenever the host-authoritative blank bit is still true, including the case where the blank bit does not change but the store still holds old values.
+- Impact: new sessions no longer keep a carried-over full context meter from a previous session state, so the UI can start from an empty/blank projection baseline instead of showing 100% by default.
+- Notes: this is a defensive client-side cleanup for blank sessions; it does not change the host compaction algorithm itself.
+
+### Rewind drains the live agent without blocking on full handle teardown
+
+- Goal: fix two rewind regressions together: pre-rewind queued messages could survive into the next prompt, and `撤销当前轮次` could stall indefinitely at `正在撤销...` while waiting for whole-runtime teardown.
+- Files: packages/rewind/session-rewind/src/index.ts, packages/host/apiproxy/src/api-proxy.ts, packages/host/apiproxy/tests/api-proxy-cold.spec.ts, README.md.
+- Changes: rewind now prefers the live agent path: clear `agent.inbox`, cancel the current activity with `keepInbox: true`, and wait only for `whenIdle()` before validation, restore, and trim; it falls back to `sessionRuntime.stopSessionAndWait()` only when no live agent is attached. The host stop helper still clears queued inbox work before full teardown, and the host regression test remains in place for queue removal.
+- Impact: rewind no longer carries forward stale queued or steering messages into the next prompt, and the confirm dialog no longer waits on full handle disposal before the rewind can complete.
+- Notes: this change is scoped to rewind/session-stop behavior and does not change ordinary queue ordering while a session keeps running.
+
+### Rewind also clears the session's local draft state before reopening
+
+- Goal: keep a rewound session from resending the pre-rewind draft text or draft images with the next message.
+- Files: packages/client/ui-conversation/src/client/input/contract.ts, packages/client/ui-conversation/src/client/input/facade.ts, packages/client/ui-session-rewind/src/client/index.ts, README.md.
+- Changes: added a small rewind-only `resetForRewind()` input action that clears the current draft text, resets browser-owned draft image ids, and clears the notice slot; the rewind reopen path now calls it before `sessions.reopen(sessionId)`. Added a client scenario test that proves the rewind reset clears local draft text, draft images, and stale notices before the session view is rebuilt.
+- Impact: after a rewind, the composer starts from an empty local draft state instead of restoring old queued text or images into the next send.
+- Notes: this only affects the rewind reopen path and does not alter ordinary send, undo, or queue-steer behavior.
+
+### Angelina theme enters the client as an optional plugin
+
+- Goal: bring the Angelina visual style into the current DSH client as an opt-in theme plugin instead of replacing the default theme.
+- Files: packages/client/ui-angelina/package.json, packages/client/ui-angelina/tsconfig.json, packages/client/ui-angelina/tsdown.config.ts, packages/client/ui-angelina/src/index.ts, packages/client/ui-angelina/src/invariant.ts, packages/client/ui-angelina/src/client/index.ts, packages/client/ui-angelina/src/client/style.ts, packages/client/ui-angelina/src/client/locales.ts, packages/client/ui-angelina/src/client/AngelinaRow.tsx, packages/client/ui-angelina/tests/apply.client.spec.ts, packages/bundle/web-app/package.json, packages/bundle/web-app/cordis.patch.yml, README.md.
+- Changes: added a new client-only `ui-angelina` plugin package that registers Angelina light/dark theme ids, injects a locally owned Angelina stylesheet at runtime, and contributes a General settings row for selecting Angelina light, Angelina dark, or restoring the system theme; added the plugin to the web-app bundle roster and dependency manifest.
+- Impact: the current client can load Angelina as an optional built-in plugin without changing the default theme path or requiring an external plugin checkout.
+- Notes: this first pass ports the Angelina theme as a lightweight local stylesheet and theme selector row; it does not yet import the full external plugin's artwork and parallax asset pipeline.
+
+### Rewind reset no longer recreates an input shell on a dead session scope
+
+- Goal: fix the rollback runtime error `cannot create effect on inactive context` that could surface while reopening a rewound session.
+- Files: packages/client/ui-conversation/src/client/input/hub.ts, packages/client/ui-conversation/src/client/apply.ts, README.md.
+- Changes: added an `existingShell(sessionId)` read path on `InputHub` and changed the rewind-only `conversationInput.resetForRewind(sessionId)` service to clear only an already resident shell instead of calling `shell(sessionId)`, which could otherwise try to mint a fresh shell and attach `actx.effect(...)` listeners onto a scope already being torn down by `sessions.reopen()`.
+- Impact: rewinding a session no longer tries to create input-side effects on an inactive session context during the reopen transition, so the rollback flow can clear browser-owned draft state without throwing that runtime error.
+- Notes: this is intentionally rewind-specific; ordinary session navigation still lazily creates shells through the existing `shell(sessionId)` path when a live binding is needed.
+
+### Desktop rebuild now produces both the desktop shell and installer
+
+- Goal: make `build-desktop.bat` refresh both desktop delivery targets so a manual build updates `apps/desktop/src-tauri/target/release/dsh-desktop.exe` as well as the custom installer executable.
+- Files: build-desktop.bat, README.md.
+- Changes: after preparing the embedded `apps/desktop/bundle`, the script now explicitly runs `apps/desktop`'s `build:no-bundle` to refresh the desktop shell executable before running `apps/desktop-installer`'s `build:setup`; the final summary now prints both output paths.
+- Impact: running `build-desktop.bat` now updates the desktop shell under `apps/desktop/src-tauri/target/release/` and the installer under `apps/desktop-installer/src-tauri/target/release/`, so the manual build output matches both expected delivery locations.
+- Notes: `build:no-bundle` still rebuilds the desktop shell against the freshly prepared embedded bundle; the installer step remains responsible for packaging the payload zip and setup executable.
+
+### Rewind now stops the live session runtime before trimming
+
+- Goal: move the rewind execution path closer to `cc-dsh` so rollback kills the active session runtime before transcript trimming, instead of trying to keep the old live session limping through an in-place cancel path.
+- Files: packages/rewind/session-rewind/src/index.ts, README.md.
+- Changes: the rewind host service now prefers `sessionRuntime.stopSessionAndWait(sessionId)` whenever that runtime stop contract is available, and only falls back to a direct agent cancel path when the host composition has no session-runtime service.
+- Impact: queued work is more likely to die with the rewound runtime instead of surviving into the next send, which is the first step toward `cc-dsh` parity for rollback semantics.
+- Notes: this is a host-path correction only; the client rewind UI and session-window parity work is still being aligned separately.
+
+### Rewind now forces a fresh mux subscribed generation
+
+- Goal: make rollback establish the same kind of fresh mux baseline a reconnect produces, because stale queued prompts clear only when the client receives a new `session/subscribed` generation.
+- Files: packages/client/connection/src/client/index.ts, packages/client/connection/tests/client-apply.client.spec.ts, packages/client/runtime/src/client/contract/sessions.ts, packages/client/runtime/src/client/sessions/service.ts, packages/client/runtime/tests/sessions-service.client.spec.ts, packages/client/ui-session-rewind/src/client/index.ts, packages/client/ui-session-rewind/src/client/RewindCard.tsx, packages/client/ui-session-rewind/tests/RewindCard.client.spec.tsx, README.md.
+- Changes: `ctx.connection` now owns a narrow `restart()` operation that restarts the already-owned stream loop with the same sinks and config; rewind success resets its checkpoint controller, clears the resident input shell through `ctx.conversationInput.resetForRewind(sessionId)`, reopens the selected session scope, and then calls `ctx.connection.restart()` so the runtime receives a fresh mux handshake and `session/subscribed` replay.
+- Impact: rollback now has a real path to clear stale queue mirrors, stale draft state, and half-restored input notices before re-baselining the chat window from the host-trimmed session.
+- Notes: the session-runtime `resync(sessionId)` operation remains available for explicit session-local rebuilds, but rewind needs the wider connection-generation reset plus the input-shell reset and session reopen to recover a usable composer.
+
+### Client GUI tests now use the full fake API client
+
+- Goal: restore `pnpm run build:lib:client` after the stricter connection typing made several GUI assembly tests' partial `{ settings: ... }` connection handles invalid.
+- Files: packages/client/ui-conversation/tests/apply-inject.client.spec.tsx, packages/client/ui-conversation/tests/assembly-surfaces.client.spec.tsx, packages/client/ui-conversation/tests/chat-apply.client.spec.tsx, packages/client/ui-tool/tests/assembly-surfaces.client.spec.tsx, packages/client/ui-tool/tests/toolview-slot.client.spec.tsx, packages/client/runtime/tests/fake-api.client.ts, README.md.
+- Changes: the affected GUI tests now use `FakeApiClient`, the repo's full `IApiClient` test double, instead of hand-writing partial `connection.api` objects; where a test still cares about settings behavior, it overrides only the needed `api.settings.*` methods on the fake. This round also restored the `SlotTestRuntime`, `usePinnedBrowserLanguages`, and `stubSettingsScope` imports after the temporary refactor left those tests with unresolved names.
+- Impact: client build typechecking now sees a complete `IApiClient` on the fake connection service, so tightening the connection contract no longer breaks these GUI tests.
+- Notes: `conversation.chat.steering` now uses its dedicated `SteeringMessageNodeView` again; the user-action child slot stays owned by the user node only, which avoids the duplicate child declaration that the slot registry rejects.
+
+### Rewind checkpoint cards refetch immediately when a turn completes
+
+- Goal: fix the regression where the `当前轮次检查点 / 撤销当前轮次` card could appear only after restarting the client instead of showing up as soon as the turn finished.
+- Files: packages/client/ui-session-rewind/src/client/rewind-controller.ts, packages/client/ui-session-rewind/tests/rewind-controller.client.spec.ts, README.md.
+- Changes: tightened the per-session checkpoint controller's cache gate so a changed completed-turn count always triggers a fresh `listTurnCheckpoints` read unless the exact same turn count is already loaded outside the cold state; added a focused controller test that proves a ready controller refetches when the completed-turn count advances.
+- Impact: the rewind checkpoint card now appears live at the end of a turn instead of waiting for a full client restart to repopulate the checkpoint list.
+- Notes: this change only affects the checkpoint-list refresh path; the per-turn card still renders only for closed turns and still depends on the host returning a checkpoint for that target message.
+
+### Desktop rebuild clears locked bundled Node and builds the custom installer
+
+- Goal: make `build-desktop.bat` recover automatically when Windows leaves `apps/desktop/bundle/node/node.exe` locked by a stale process during the desktop build, and route the final output to the custom installer at `apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe` instead of the NSIS setup bundle.
+- Files: build-desktop.bat, README.md.
+- Changes: the desktop build now probes for processes that are actively using the bundled Node binary and force-stops them before invoking `apps/desktop-installer`'s `build:setup` path; the script now ends by reporting the custom installer executable.
+- Impact: rerunning the desktop build no longer fails immediately on a stale `node.exe` file lock from the previous bundle, and the build output is the custom installer executable instead of `DeepSeek Harness_0.1.0_x64-setup.exe`.
+- Notes: the cleanup is scoped to the bundled Node path only; it does not touch unrelated Node processes.
+
+### Rewind rewritten around session teardown (cc-haha parity): dispose live agent, trim log, reopen view in place
+
+- Goal: the previous rewind fixes were still unstable — a rollback could leave pre-rewind queued prompts that were re-sent with the next message, turns without file changes showed no rollback card, and the client fell back to a full page refresh. The reference (`cc-haha`) stops the session runtime entirely before trimming, then reloads history in place; this change ports that flow end to end.
+- Files: packages/host/apiproxy/src/api-proxy.ts (gateway keeps every resumed/created AgentHandle and exposes `sessionRuntime.stopSessionAndWait`, the production equivalent of the reference `stopSessionAndWait` that kills the CLI subprocess), packages/host/apiproxy/src/index.ts (registers `ctx.sessionRuntime`), packages/rewind/session-rewind/src/index.ts (execute now disposes the live agent/Session via `sessionRuntime` before trimming; falls back to cancel+drain when the host service is absent), packages/rewind/session-rewind/src/rewind.ts (every completed turn is listed, even with zero file changes, so the card always appears after a turn), packages/client/runtime/src/client/sessions/service.ts + contract/sessions.ts (new public `reopen(id)` that tears down the resident scope/Session and reselects the same id), packages/client/ui-session-rewind (injects the sessions runtime; after a successful execute it resets the checkpoint cache and calls `reopen`, replacing the backend-restart/page-reload path), packages/test-support/client-runtime/src/sessions.ts (test double implements `reopen`), packages/rewind/session-rewind/tests/rewind.spec.ts (checkpoint-list expectations updated), README.md.
+- Changes: executing a rewind now disposes the live agent and its Session (loop quiescence, registry unregistration, live Session removal, scope unwind), so the inbox cannot outlive the rollback and queued prompts die with the runtime exactly like killing the reference CLI process; the durable log trim then rewrites the session from the target turn onward; the client rebuilds the current session view in place via `reopen`, backfilling the trimmed history from the host without restarting the backend or refreshing the page; every completed turn now yields a rewind card even when the turn changed no files.
+- Impact: pre-rewind queued messages are no longer re-sent after a rollback; the rollback card appears for every completed turn (including aborted turns and zero-file-change turns); rolling back reloads only the conversation view in place, matching the reference behavior instead of a full refresh.
+- Notes: rebuilding the desktop installer requires the full `build:lib`, `apps/desktop` bundle, and `apps/desktop-installer` pipeline; the generated artifact is `apps/desktop-installer/src-tauri/target/release/dsh-desktop-installer.exe`.
+
+### Session rewind reliability fixes: live card refresh, queue clearing, in-place session reload
+
+- Goal: the rewind card only appeared after restarting the client, a rollback left pre-rewind queued prompts in the agent inbox (they were re-sent with the next message), and executing a rollback forced a full page refresh instead of reloading the conversation in place like the reference desktop flow.
+- Files: packages/rewind/session-rewind/src/index.ts (execute clears the agent inbox), packages/client/ui-session-rewind (controller refetches checkpoints when the completed-turn count moves; card restarts the backend in place instead of reloading the page), apps/desktop/src-tauri/src/lib.rs + build.rs + capabilities/default.json + permissions/autogenerated/restart_backend_in_place.toml (new `restart_backend_in_place` command: restarts the dsh backend on the same port without navigating the windows), README.md, README.zh.md.
+- Changes: each completed turn now refetches `sessionRewind/listTurnCheckpoints` when the turn count moves, so the card appears as soon as the turn finishes; `execute` clears queued and steering inbox items (durable splice) so nothing queued before the rollback can leak into the next send; after a successful rewind the desktop shell restarts the backend on the same port and the web client's event stream reconnects, re-baselining the session in place — no page reload, matching the reference reload-history behavior.
+- Impact: the rollback card is live per turn, rollback no longer re-sends pre-rewind queued prompts, and the conversation view rewinds in place instead of flashing a full reload.
+- Notes: the plain-browser fallback still reloads the page when no desktop shell is present; rebuild the client bundles and the desktop app for the fixes to ship.
+
+### Session rewind UI restored: per-turn checkpoint card wired to the sessionRewind Remote
+
+- Goal: the cc-haha rewind port shipped the host service but removed the old frontend, so no undo surface was visible; restore the reference turn-tail flow — every completed turn ends with the "N 个文件已更改" card and "撤销当前轮次 / 回滚到这一轮之前" — now driven by the new backend.
+- Files: packages/client/ui-session-rewind (new; `rewind` entry of the `conversation.chat.turnTail` chain + cc-haha copy + RewindCard/RewindController + tests), packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx (restored the rollback-draft composer hook), packages/bundle/web-app/{package.json,cordis.patch.yml}, tsconfig.client.json, README.md, README.zh.md.
+- Changes: each completed turn renders the checkpoint card from `sessionRewind/listTurnCheckpoints` (one list read per session): changed-file count, +N/-M badges, per-file rows opened through the chat opener, the reference cautions (an incomplete checkpoint only offers "只回滚对话"; a partial checkpoint names the unrecorded tools), and the reference confirm dialog. Confirming calls `sessionRewind/execute` with the chosen mode; the desktop shell restarts the dsh service in place and the conversation view re-baselines without a page reload, and the composer stays empty so only the next message the user types is sent.
+- Impact: the rollback feature is visible again, matches the reference desktop layout, and runs entirely on the ported `dsh-session-rewind` host service; the Rust diff server remains removed.
+- Notes: requires the zod dependency fix in `dsh-session-rewind` (previous entry) to boot; rebuild the client bundles and the desktop app for the card to ship.
+
+### Session rewind startup fix: declare the zod dependency the generated remote needs
+
+- Goal: the desktop app failed to boot with `client-modules: require("zod") missed the module table` after the rewind port, because `@deepseek-ai/dsh-session-rewind`'s generated Typert remote imports zod while the package did not declare it.
+- Files: packages/rewind/session-rewind/package.json, README.md, README.zh.md.
+- Changes: added `"zod": "^4.4.3"` to the package's dependencies, matching every other package that ships a generated Typert remote. With zod resolvable from the package's own node_modules, tsdown inlines it into the api-remotes client bundle instead of emitting `require("zod")`.
+- Impact: startup no longer fails on the loader module table; the rewind remotes load like the other generated remotes.
+- Notes: rerun pnpm install, rebuild the client bundles, and rebuild the desktop app for the fix to ship.
+
 ### Sidebar toggle no longer re-renders the workbench every frame
 
 - Goal: remove the dropped-frame displacement of conversation content while
@@ -596,3 +740,11 @@ Third-party dependencies and their licenses are disclosed in [THIRD_PARTY_NOTICE
 - Changes: the desktop diff server now creates and writes a local SQLite history at <workspace>/.recode/history.db, records file diffs while a session is active, and exposes snapshot/status/rollback endpoints. User-sent messages show a small rollback button; clicking it restores files and the conversation log to the snapshot taken before that user message.
 - Impact: all history and rollback stays local; no server or network is required. Binary files are skipped.
 - Notes: a snapshot is created when each user message mounts in the conversation, and clicking that message rolls back its files and conversation log to the snapshot. The desktop shell no longer copies the live session JSONL directly; offset-based session-log restore is implemented.
+
+
+### Conversation rewind (cc-haha port, replaces SQLite-history rollback)
+
+- Goal: replace the desktop diff-server rollback with a 1:1 port of the reference rewind service (cc-haha `src/server/services/sessionRewindService.ts` + `src/utils/fileHistory.ts`), operating on the event-sourced session log.
+- Files: packages/rewind/file-history (new; service + recording hooks + backup artifacts under `{dshHome}/file-history/{sessionId}/`), packages/rewind/session-rewind (new; Typert Remotes `sessionRewind/preview|execute|listTurnCheckpoints|getTurnCheckpointDiff`), packages/session/session-persistence, session-persistence-jsonl, session-persistence-sqlite (`trim`), packages/core/session (event catalog), tsconfig.base.json, tsconfig.host.json, packages/bundle/base, packages/bundle/web-app, packages/api/remotes; removed apps/desktop/src-tauri/src/diff_server.rs, packages/client/ui-sidebar-toggle, and the rollback-draft hook in packages/client/ui-conversation.
+- Changes: file-history records a turn-start snapshot per direct user message and a first-edit backup per file-mutating tool call, both appended to the session log as `file/history-snapshot` events; the rewind service previews/executes rollback to any direct user message, restoring files from the snapshot fold and trimming the log at the target turn's `turn/start`. The 2000-line tree-sitter bash read-only classifier is replaced by a conservative self-contained allowlist with the same contract.
+- Impact: rollback now lives in the dsh backend (Typert RPC) instead of the Rust diff server; the desktop flow restarts the dsh service after execute so the trimmed log replays.

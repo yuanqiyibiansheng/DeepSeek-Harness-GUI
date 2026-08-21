@@ -14,6 +14,8 @@ import LlmRuntime, { createUserMessage,
 import { MAX_TIMER_DELAY_MS } from '@deepseek-ai/dsh-timeout'
 import { getOrCreateAnonymousUserId, type AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import { AttachmentId } from '@deepseek-ai/dsh-attachment'
+import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
 import * as LlmDeepSeek from '@deepseek-ai/dsh-llm-deepseek'
 import { DeepSeekAdapter, resolveAdapterOptions } from '@deepseek-ai/dsh-llm-deepseek'
 import { httpErrorCode } from '../src/adapter.ts'
@@ -387,6 +389,12 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(httpErrorCode(400, { message: 'invalid input: temperature exceeds maximum allowed value' }))
       .toBe('INVALID_REQUEST')
     expect(httpErrorCode(413, { code: 'context_length_exceeded' })).toBe('HTTP_413')
+    // DeepSeek's four-part overflow detail: an HTTP 400 whose reason names a
+    // token/context bound must route to the automatic-compaction recovery path.
+    expect(httpErrorCode(400, { message: 'Input token exceed the limit', code: 'quota_limit_reached' }))
+      .toBe(CONTEXT_WINDOW_EXCEEDED_CODE)
+    expect(httpErrorCode(400, { message: 'Input tokens exceed the model max limit' }))
+      .toBe(CONTEXT_WINDOW_EXCEEDED_CODE)
   })
 
   it('distinguishes terminal quota exhaustion from transient HTTP 429 throttling', () => {
@@ -658,8 +666,8 @@ describe('plugin registration and config', () => {
     await ctx.plugin(LlmDeepSeek, { baseURL: 'http://127.0.0.1:1' })
     expect(ctx.llm.listProviders()).toEqual([{ id: 'deepseek-official', name: 'DeepSeek' }])
     await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', inputModalities: ['text'] },
-      { provider: 'deepseek-official', id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', inputModalities: ['text'] },
+      { provider: 'deepseek-official', id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', inputModalities: ['text', 'image'] },
+      { provider: 'deepseek-official', id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', inputModalities: ['text', 'image'] },
     ])
     await expect(ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-v4-flash'))
       .resolves.toMatchObject({
@@ -753,8 +761,8 @@ describe('plugin registration and config', () => {
     await ctx.plugin(LlmRuntime)
     LlmDeepSeek.apply(ctx, { baseURL: 'http://127.0.0.1:1' })
     await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', inputModalities: ['text'] },
-      { provider: 'deepseek-official', id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', inputModalities: ['text'] },
+      { provider: 'deepseek-official', id: 'deepseek-v4-flash', name: 'DeepSeek-V4-Flash', inputModalities: ['text', 'image'] },
+      { provider: 'deepseek-official', id: 'deepseek-v4-pro', name: 'DeepSeek-V4-Pro', inputModalities: ['text', 'image'] },
     ])
   })
 
@@ -774,8 +782,8 @@ describe('plugin registration and config', () => {
       ],
     })
     await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
-      { provider: 'deepseek-official', id: 'private-fast', name: 'private-fast', inputModalities: ['text'] },
-      { provider: 'deepseek-official', id: 'private-reasoner', name: 'Private Reasoner', description: 'Higher reasoning budget', inputModalities: ['text'] },
+      { provider: 'deepseek-official', id: 'private-fast', name: 'private-fast', inputModalities: ['text', 'image'] },
+      { provider: 'deepseek-official', id: 'private-reasoner', name: 'Private Reasoner', description: 'Higher reasoning budget', inputModalities: ['text', 'image'] },
     ])
     await expect(ctx.llm.resolveModelInfo('deepseek-official', 'private-fast'))
       .resolves.toMatchObject({ context: { contextWindow: 32_000 } })
@@ -1007,6 +1015,40 @@ describe('plugin registration and config', () => {
     // Direct embedding shares the plugin's one resolve step, so it advertises
     // the same default catalog instead of a divergent empty one.
     await expect(adapter.listModels('deepseek-official')).resolves.toHaveLength(2)
+  })
+
+  it('advertises declared image modality on a vision catalog model', async () => {
+    const ctx = new Context()
+    await ctx.plugin(LlmRuntime)
+    await ctx.plugin(LlmDeepSeek, {
+      baseURL: 'http://127.0.0.1:1',
+      models: [{ id: 'deepseek-v4-flash-vision-exp', inputModalities: ['text', 'image'] }],
+    })
+    await expect(ctx.llm.resolveModelInfo('deepseek-official', 'deepseek-v4-flash-vision-exp'))
+      .resolves.toMatchObject({ inputModalities: ['text', 'image'] })
+    await expect(ctx.llm.listModels('deepseek-official')).resolves.toEqual([
+      { provider: 'deepseek-official', id: 'deepseek-v4-flash-vision-exp', name: 'deepseek-v4-flash-vision-exp', inputModalities: ['text', 'image'] },
+    ])
+  })
+
+  it('refuses image content when no attachment store is mounted', async () => {
+    const ref: ImageAttachmentRef = {
+      attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+      mediaType: 'image/png', bytes: 68, width: 1, height: 1,
+    }
+    // `adapterOf` injects no attachment resolver, so an image-bearing request
+    // must refuse instead of silently dropping the image.
+    const adapter = adapterOf()
+    await expect(async () => {
+      for await (const _chunk of adapter.stream({
+        provider: 'deepseek-official',
+        model: 'deepseek-v4-flash',
+        messages: [createUserMessage({
+          content: [{ type: 'image', attachment: ref }],
+          source: { kind: 'plugin', plugin: 'test' },
+        })],
+      })) { /* drain */ }
+    }).rejects.toMatchObject({ code: 'UNSUPPORTED_CONTENT' })
   })
 
   it('resolves connection facts and the credential exactly once per stream call', async () => {

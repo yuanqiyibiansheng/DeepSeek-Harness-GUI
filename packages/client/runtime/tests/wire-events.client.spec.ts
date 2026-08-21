@@ -72,6 +72,7 @@ async function mount(): Promise<Bench> {
       bench.sinks = sinks
       return { stop: () => {} }
     },
+    restart: () => {},
   }
   ctx.reflect.provide('connection', handle)
   ctx.reflect.provide('remote.commands', fakeRemote().commands)

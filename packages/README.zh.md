@@ -56,6 +56,7 @@ npm scope 为 `@deepseek-ai/dsh-*`；Cordis `Service` 子类和函数插件通�
 | [`client/`](client/README.md) | web GUI 浏览器半侧：shell、协议层、对象服务、slot、`ui-*` 插件 | 产品：稳定 API |
 | [`examples/`](examples/README.md) | 演示组合包（agent-spine + CLI（命令行界面）/ACP/JSON-RPC bin），由叶节点加载 | 支持：示例基础设施 |
 | [`test-support/`](test-support/README.md) | 支持基础设施（testkit、不变式、回放、Loader 冒烟测试） | 支持：兼容性预期较低 |
+| [`rewind/`](rewind/README.md) | 会话回滚：逐消息文件备份与对话+文件回滚 | 产品：稳定 API |
 | [`util/`](util/README.md) | 组间共享的低层零依赖工具（`Branded<B>`、Harness home／路径辅助函数、超时、留存） | 支持：小型、稳定、无 harness 依赖 |
 
 新包加入现有组；新组更新其 README 和此表。

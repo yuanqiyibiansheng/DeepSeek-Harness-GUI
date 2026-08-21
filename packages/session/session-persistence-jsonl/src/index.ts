@@ -9,7 +9,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { readdirSync } from 'node:fs'
-import { open, mkdir, readFile, readdir, realpath, link, rm, stat, truncate } from 'node:fs/promises'
+import { open, mkdir, readFile, readdir, realpath, link, rename, rm, stat, truncate } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { performance } from 'node:perf_hooks'
 import { scheduler } from 'node:timers/promises'
@@ -30,7 +30,7 @@ import {
 import {
   compressZstdFrame, createZstdFrameDecoder, decompressZstdFrame, decompressZstdPrefix, scanZstdFrames,
 } from './zstd.ts'
-import { ensureDurableDirectoryWin32, publishNewFileWin32 } from './win32.ts'
+import { ensureDurableDirectoryWin32, publishNewFileWin32, publishReplacingFileWin32 } from './win32.ts'
 
 export type { JsonlCompression } from './format.ts'
 
@@ -199,6 +199,10 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
+  override trim(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    return this.coordinator.trim(id, cutoffSeq, signal)
+  }
+
   // One method serves both public `list` and the backend hook; delegating it to
   // the coordinator would call this hook recursively.
 
@@ -234,6 +238,44 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       if (isENOENT(error)) return undefined
       throw error
     }
+  }
+
+  /**
+   * Rewrite the stored log to keep only the committed events with
+   * `seq < cutoffSeq`. The complete committed prefix is decoded, filtered,
+   * re-encoded in the configured physical representation, and published
+   * atomically over the existing artifact (temp-write + durable rename).
+   * @param id - the persisted session to trim.
+   * @param cutoffSeq - first event seq to remove (non-negative safe integer).
+   * @param signal - optional cancellation for decode/rewrite work.
+   * @returns the number of removed events.
+   */
+  async trimStored(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    signal?.throwIfAborted()
+    await this.ensureRootEncoding()
+    signal?.throwIfAborted()
+    const path = await this.findLog(id, signal)
+    if (path === undefined) throw new Error(`session "${id}" not found`)
+    const prefix = await this.readPrefix(path, id, signal)
+    const kept = prefix.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = prefix.events.length - kept.length
+    if (removedCount === 0) return { removedCount }
+
+    const content = await this.encodeMaterialization(prefix.meta, kept)
+    signal?.throwIfAborted()
+    const tmp = await this.writeSyncedTempFile(path, content)
+    try {
+      if (process.platform === 'win32') {
+        await publishReplacingFileWin32(tmp, path)
+      } else {
+        await rename(tmp, path)
+        await this.syncDirPosix(dirname(path))
+      }
+    } catch (error) {
+      await rm(tmp, { force: true }).catch(() => {})
+      throw error
+    }
+    return { removedCount }
   }
 
   /**

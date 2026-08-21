@@ -15,7 +15,7 @@ import type { ClientContext, SettingsScope } from '@deepseek-ai/dsh-client-runti
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { AppearanceRowInjected } from './AppearanceRow.tsx'
+import type { AppearanceRowInjected, AppearanceRowOption } from './AppearanceRow.tsx'
 import { AppearanceRow } from './AppearanceRow.tsx'
 import { createAppearanceRowStore } from './settings-store.ts'
 import { en, zh, type ThemeKey } from './locales.ts'
@@ -36,6 +36,20 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** The Appearance settings row's copy. */
     'settings.theme': ThemeKey
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * Resolved theme snapshot changed.
+     * @mode emit
+     * @param snapshot - latest theme snapshot.
+     */
+    'theme/change'(snapshot: ThemeSnapshot): void
+  }
+  interface Context {
+    theme: ThemeRuntime
   }
 }
 
@@ -100,19 +114,14 @@ export interface ThemeTokenInspection {
   cssVariable?: string
 }
 
-declare module '@deepseek-ai/cordis' {
-  interface Context {
-    theme: ThemeRuntime
-  }
-  interface Events {
-    /**
-     * Theme state changed (preference switched, registry updated, or the OS
-     * color scheme changed while the preference is `system`).
-     * @param snapshot - Current immutable theme snapshot.
-     * @mode emit
-     */
-    'theme/change'(snapshot: ThemeSnapshot): void
-  }
+function appearanceOptions(t: (key: ThemeKey) => string): AppearanceRowOption[] {
+  return [
+    { id: 'light', label: t('appearance.light'), kind: 'light' },
+    { id: 'dark', label: t('appearance.dark'), kind: 'dark' },
+    { id: 'angelina-light', label: '安洁莉娜亮色', kind: 'light' },
+    { id: 'angelina-dark', label: '安洁莉娜暗色', kind: 'dark' },
+    { id: 'system', label: t('appearance.system'), kind: 'system' },
+  ]
 }
 
 const BUILTIN_THEMES: readonly ThemeDefinition[] = Object.freeze([
@@ -326,7 +335,7 @@ export class ThemeRuntime {
   private publish(): void {
     this.revision += 1
     this.snapshot = this.buildSnapshot()
-    this.ctx.emit('theme/change', this.snapshot)
+    this.ctx.emit(this.ctx, 'theme/change', this.snapshot)
   }
 }
 
@@ -398,9 +407,17 @@ export function apply(ctx: ClientContext): void {
     bound = actions
     // Re-sync from the getter so no event is lost between registration and
     // first render (the store's revision guard drops stale duplicates).
-    sync(theme.getTheme())
+    const snapshot = theme.getTheme()
+    sync(snapshot)
     return {
       setTheme: (id) => { theme.setTheme(id) },
+      options: appearanceOptions(key => key === 'appearance.light'
+        ? '亮色模式'
+        : key === 'appearance.dark'
+          ? '暗色模式'
+          : key === 'appearance.system'
+            ? '跟随系统'
+            : '外观'),
     }
   }
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({

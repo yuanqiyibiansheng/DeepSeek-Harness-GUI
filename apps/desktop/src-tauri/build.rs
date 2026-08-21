@@ -9,6 +9,7 @@ fn main() {
       .app_manifest(tauri_build::AppManifest::new().commands(&[
         "pet_control",
         "restart_service",
+        "restart_backend_in_place",
         "balance_query",
         "notify_task_done",
         "open_recharge",

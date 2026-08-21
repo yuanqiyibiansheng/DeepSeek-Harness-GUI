@@ -234,6 +234,7 @@ describe('DetailsPanel web Output section', () => {
           removeImage: () => {},
           pruneImages: () => {},
           submit: () => {},
+          resetForRewind: () => {},
         }}
         useProjection={(() => undefined)}
         useStore={bindSnapshotSelector(chat)}

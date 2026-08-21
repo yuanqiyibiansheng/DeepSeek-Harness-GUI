@@ -290,7 +290,8 @@ export class BasicCompactionEngine extends CompactionEngine {
       return this.compactRegion(range.start, range.end, agent, signal)
     }
 
-    const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context
+    const modelInfo = await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)
+    const context = modelInfo.context
     assertNoActiveCompaction(agent.session, 'automatic pressure compaction')
     const targetKey = `${target.provider}/${target.model}`
     if (context === undefined) {
@@ -300,7 +301,7 @@ export class BasicCompactionEngine extends CompactionEngine {
         + 'configure contextWindow on that adapter model',
       )
     }
-    const spec = resolveCompactSpec(policy, context.contextWindow)
+    const spec = resolveCompactSpec(policy, context.contextWindow, modelInfo.maxTokens)
     if (measurement.totalTokens < spec.thresholdTokens) return null
 
     // Once pressure qualifies, land the model-free pass before choosing a

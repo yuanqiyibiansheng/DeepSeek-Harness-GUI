@@ -100,7 +100,7 @@ describe('hand-declared providers', () => {
     const ctx = await harness(gateway(`${server.url}/v1`))
 
     expect(await ctx.llm.listModels('acme-gateway')).toEqual([
-      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text'] },
+      { provider: 'acme-gateway', id: 'acme-large', name: 'Acme Large', inputModalities: ['text', 'image'] },
     ])
     const info = await ctx.llm.resolveModelInfo('acme-gateway', 'acme-large')
     expect(info).toMatchObject({
@@ -212,7 +212,7 @@ describe('hand-declared providers', () => {
     const inputOf = (route: string, id: string): readonly string[] | undefined =>
       resolved.get(route)?.piProvider.getModels().find(model => model.id === id)?.input
 
-    expect(inputOf('acme-gateway', 'bare')).toEqual(['text'])
+    expect(inputOf('acme-gateway', 'bare')).toEqual(['text', 'image'])
     expect(inputOf('acme-gateway', 'seeing')).toEqual(['text', 'image'])
     expect(inputOf('acme-gateway', 'deaf')).toEqual(['text'])
     expect(inputOf('seeing-gateway', 'bare')).toEqual(['text', 'image'])
@@ -246,7 +246,7 @@ describe('hand-declared providers', () => {
     const listed = async (provider: string): Promise<Record<string, readonly string[] | undefined>> =>
       Object.fromEntries((await ctx.llm.listModels(provider)).map(model => [model.id, model.inputModalities]))
 
-    expect(await listed('acme-gateway')).toEqual({ bare: ['text'], seeing: ['text', 'image'] })
+    expect(await listed('acme-gateway')).toEqual({ bare: ['text', 'image'], seeing: ['text', 'image'] })
     expect(await listed('vision-gateway')).toEqual({ bare: ['text', 'image'], deaf: ['text'] })
     expect((await ctx.llm.resolveModelInfo('acme-gateway', 'seeing')).inputModalities).toEqual(['text', 'image'])
 
@@ -273,7 +273,7 @@ describe('hand-declared providers', () => {
         models: [{ id: 'bare', input: [] }],
       },
     })
-    expect(resolved.get('acme-gateway')?.piProvider.getModels()[0]?.input).toEqual(['text'])
+    expect(resolved.get('acme-gateway')?.piProvider.getModels()[0]?.input).toEqual(['text', 'image'])
     expect(resolved.get('deepseek')?.piProvider.getModels()[0]?.input).toEqual(catalogModel.input)
 
     // Nothing sits below the route value, so its empty list states no answer

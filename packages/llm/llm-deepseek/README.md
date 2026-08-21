@@ -33,9 +33,14 @@ The package root exposes the Cordis plugin contract and `DeepSeekAdapter`; wire 
       - id: private-reasoner
         description: Company-hosted reasoning model
         contextWindow: 512000
+      - id: deepseek-v4-flash-vision-exp
+        name: DeepSeek-V4-Flash-Vision
+        inputModalities: [text, image]   # optional; an explicit declaration wins over the default
 ```
 
 The plugin registers the single provider route `deepseek-official` together with its resolved `retryPolicy`. A request selects it with `provider: deepseek-official`; its `model` is passed through as the wire `model` string, so changing DeepSeek models does not require lifecycle-time registration. Omitting `models` advertises `deepseek-v4-flash` as `DeepSeek-V4-Flash` and `deepseek-v4-pro` as `DeepSeek-V4-Pro`, each with a 1,000,000-token context window; an explicit list replaces those defaults, while `models: []` advertises none. Catalog entries are exposed through `ctx.llm.listModels('deepseek-official')` for clients such as ACP editors and the Web selector, but remain advisory: unlisted model ids still pass through unchanged. An omitted entry name defaults to its id.
+
+A catalog entry may declare `inputModalities` to advertise (or narrow) what a model accepts; the declaration wins. With no declaration the entry and any unlisted pass-through id default to `[text, image]`, so image capability is decided by the provider rather than by a harness preflight guard — a genuinely text-only model that receives an image fails at the API with its own 400. `ctx.llm.resolveModelInfo` and `listModels` report the resolved modalities, which is what lets the `read_image` tool gate and the upload preflight pass for a vision model such as `deepseek-v4-flash-vision-exp`. Images are serialized only on user messages; the request must also mount the durable attachment service (`ctx.attachments`) so the adapter can read the image bytes into a base64 data URL. A deployment that wants the conservative behavior can declare `inputModalities: [text]` on an entry instead.
 
 `contextWindow` is optional per configured model and is not exposed through the advisory catalog. `ctx.llm.resolveModelInfo('deepseek-official', model).context` returns an exact model value first, then `defaultContextWindow` for an entry without capacity or an unlisted pass-through id. The adapter default is 1,000,000; pressure-sensitive plugins therefore get deployment-owned capacity without treating the model selector as authoritative. Registering another adapter for `deepseek-official` throws `LlmError('DUPLICATE_ADAPTER')`.
 
@@ -71,6 +76,7 @@ DeepSeek request identity is separate from app attribution. After credential res
 - The first thinking-mode chunk carries `reasoning_content: ""` — handled (no spurious reasoning block).
 - **Reasoning passback rule**: on assistant turns that carried tool calls, `reasoning_content` is serialized back in history (required by the API in thinking mode); on tool-call-free turns it is dropped (ignored anyway — saves tokens).
 - Cache accounting: `cacheReadTokens` ← `prompt_cache_hit_tokens` / `prompt_tokens_details.cached_tokens`; DeepSeek reports no cache-write metric.
+- **Image content**: a user-message image block serializes as an OpenAI-compatible `image_url` part carrying a base64 data URL. Images are accepted only on user messages (matching the provider restriction); an image in a system, assistant, or tool message, or any user image when no attachment service is mounted, fails with `UNSUPPORTED_CONTENT` instead of being silently dropped.
 
 ## Errors
 
@@ -111,4 +117,4 @@ Loop-retained response blocks append to the next request and preserve its earlie
 - **A settings `models` list replaces the composition list wholesale** — settings-layer merging is per-field, and arrays are one field; per-entry catalog merging would need a keyed shape.
 - **`tool_choice` is not mapped** — not part of the core vocabulary (MVP cut, shared with the pi-ai twin).
 - **Requests use raw `fetch`, not `@cordisjs/plugin-http`** — no shared proxy/interception configuration; adoption is deferred until a second adapter wants it (`TODO(http)`).
-- **Serialization flattens user and tool-result content to text blocks** — plugin-added block types are skipped, and empty tool output crosses the wire as the literal `(no output)`.
+- **Serialization flattens user text and tool-result content to text** — plugin-added block types are skipped, and empty tool output crosses the wire as the literal `(no output)`. User-message image blocks are the exception: they serialize as `image_url` data URLs, and require the durable attachment service. Tool-result images are rejected, and assistant/system messages with images are rejected.

@@ -134,6 +134,28 @@ describe('connection client apply', () => {
     }
   })
 
+  it('restarts the owned loop and republishes a fresh connected generation', async () => {
+    ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
+    const handle = await mount()
+    const descriptions: Array<boolean | undefined> = []
+    const stopDescription = handle.hostDescription.subscribe(() => {
+      descriptions.push(handle.hostDescription.getSnapshot()?.canOpenPath)
+    })
+    let connected = 0
+    const loop = handle.start({ onConnected: () => { connected++ } })
+    try {
+      await vi.waitFor(() => {
+        expect(handle.hostDescription.getSnapshot()?.canOpenPath).toBe(true)
+      })
+      handle.restart()
+      await vi.waitFor(() => { expect(connected).toBe(2) })
+      expect(descriptions).toEqual([true, undefined, true])
+    } finally {
+      stopDescription()
+      loop.stop()
+    }
+  })
+
   it('retracts the host description while reconnecting and republishes the next generation', async () => {
     ;(globalThis as Win).location = { hostname: 'localhost', search: '?fixture' }
     const handle = await mount()

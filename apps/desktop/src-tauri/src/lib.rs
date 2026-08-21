@@ -9,9 +9,7 @@ use tauri::{AppHandle, Manager, RunEvent, WebviewWindow, WindowEvent};
 use tauri_plugin_notification::NotificationExt;
 use url::Url;
 
-mod diff_server;
-struct BackendState(Mutex<Option<Child>>);
-
+struct BackendState(Mutex<Option<(Child, u16)>>);
 /// Persisted outer size of the main window, restored on the next launch.
 struct WindowSize { width: u32, height: u32 }
 
@@ -84,6 +82,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       pet_control,
       restart_service,
+      restart_backend_in_place,
       balance_query,
       notify_task_done,
       open_recharge
@@ -93,7 +92,6 @@ pub fn run() {
       if let Ok(data_dir) = app.path().app_data_dir() {
         std::env::set_var("DSH_HOME", data_dir.join("dsh"));
       }
-      diff_server::start();
       let handle = app.handle().clone();
       let window = app
         .get_webview_window("main")
@@ -136,7 +134,7 @@ pub fn run() {
           });
         }
       }
-      spawn_backend(&handle);
+      spawn_backend(&handle, None, true);
       Ok(())
     })
     .build(tauri::generate_context!())
@@ -145,7 +143,7 @@ pub fn run() {
       if let RunEvent::Exit = event {
         if let Some(state) = app.try_state::<BackendState>() {
           if let Ok(mut guard) = state.0.lock() {
-            if let Some(child) = guard.as_mut() {
+            if let Some((child, _)) = guard.as_mut() {
               kill_tree(child);
             }
           }
@@ -187,12 +185,31 @@ fn pet_control(app: AppHandle, action: String) {
 fn restart_service(app: AppHandle) -> Result<(), String> {
   if let Some(state) = app.try_state::<BackendState>() {
     if let Ok(mut guard) = state.0.lock() {
-      if let Some(child) = guard.as_mut() {
+      if let Some((child, _)) = guard.as_mut() {
         kill_tree(child);
       }
     }
   }
-  spawn_backend(&app);
+  spawn_backend(&app, None, true);
+  Ok(())
+}
+
+/// Restart the dsh web backend on the SAME port without navigating the main
+/// or pet windows: the web client's event stream reconnects and re-baselines
+/// the session view in place. Used by session rewind so rollback reloads the
+/// conversation instead of refreshing the page.
+#[tauri::command]
+fn restart_backend_in_place(app: AppHandle) -> Result<(), String> {
+  let state = app
+    .try_state::<BackendState>()
+    .ok_or_else(|| "backend state missing".to_string())?;
+  let mut guard = state.0.lock().map_err(|_| "backend state lock poisoned".to_string())?;
+  let (mut child, port) = guard
+    .take()
+    .ok_or_else(|| "backend is not running".to_string())?;
+  kill_tree(&mut child);
+  drop(guard);
+  spawn_backend(&app, Some(port), false);
   Ok(())
 }
 
@@ -347,17 +364,20 @@ fn open_recharge(url: String) -> Result<(), String> {
   Ok(())
 }
 
-/// Start the dsh web backend in a background thread and navigate the main and
-/// pet windows to it once the port answers.
-fn spawn_backend(app: &AppHandle) {
+/// Start the dsh web backend in a background thread and, when asked, navigate
+/// the main and pet windows to it once the port answers.
+fn spawn_backend(app: &AppHandle, preferred_port: Option<u16>, navigate: bool) {
   let handle = app.clone();
   thread::spawn(move || {
-    match start_backend(&handle) {
+    match start_backend(&handle, preferred_port) {
       Ok((child, port)) => {
         if let Some(state) = handle.try_state::<BackendState>() {
           if let Ok(mut guard) = state.0.lock() {
-            *guard = Some(child);
+            *guard = Some((child, port));
           }
+        }
+        if !navigate {
+          return
         }
         let url = format!("http://127.0.0.1:{port}").parse::<Url>();
         if let Ok(url) = url {
@@ -381,7 +401,7 @@ fn spawn_backend(app: &AppHandle) {
   });
 }
 
-fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {  let root = resolve_bundle_root(app).ok_or_else(|| {
+fn start_backend(app: &AppHandle, preferred_port: Option<u16>) -> Result<(Child, u16), String> {  let root = resolve_bundle_root(app).ok_or_else(|| {
     "desktop bundle not found; run pnpm run build from apps/desktop first".to_string()
   })?;
   let node = root.join("node").join("node.exe");
@@ -398,7 +418,21 @@ fn start_backend(app: &AppHandle) -> Result<(Child, u16), String> {  let root = 
     ));
   }
 
-  let port = find_free_port(3080).ok_or_else(|| "no free local port available".to_string())?;
+  let port = match preferred_port {
+    Some(port) => {
+      // The killed backend may still hold the socket briefly; wait for it to
+      // free so the replacement binds the exact port the page is on.
+      let deadline = Instant::now() + Duration::from_secs(30);
+      while TcpListener::bind(("127.0.0.1", port)).is_err() {
+        if Instant::now() > deadline {
+          return Err(format!("port {port} did not free within 30 seconds"))
+        }
+        thread::sleep(Duration::from_millis(200));
+      }
+      port
+    }
+    None => find_free_port(3080).ok_or_else(|| "no free local port available".to_string())?,
+  };
   let data_dir = app
     .path()
     .app_data_dir()

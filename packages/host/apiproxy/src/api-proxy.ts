@@ -11,7 +11,9 @@ import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import { installModelSelection } from '@deepseek-ai/dsh-agent'
-import type { Agent, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus } from '@deepseek-ai/dsh-agent'
+import type {
+  Agent, AgentHandle, ModelSelection, ModelSelectionRef, AgentOptions, AgentStatus,
+} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { ImageAttachmentRef } from '@deepseek-ai/dsh-attachment'
@@ -679,6 +681,23 @@ export interface ApiProxyDefaults {
    * falls back to platform detection ({@link canOpenNativePath}).
    */
   canOpenPath?: () => boolean
+}
+
+/**
+ * Host-owned session-runtime verbs exposed to plugins that must tear one
+ * session's live agent down (the rewind service, for example). Ported from
+ * the reference `conversationService.stopSessionAndWait`: the live agent and
+ * its Session are disposed together, so queued inbox work cannot outlive the
+ * rollback.
+ */
+export interface SessionRuntime {
+  /**
+   * Stop the live agent of one session and wait for its full teardown
+   * (loop quiescence, registry unregistration, Session removal, scope
+   * unwind). A cold session is a no-op.
+   * @param sessionId - the session whose live runtime to stop.
+   */
+  stopSessionAndWait(sessionId: SessionId): Promise<void>
 }
 
 /** The tool/call payload fields the presenter path reads. */
@@ -1389,7 +1408,11 @@ function runPluginCommand(args: readonly string[]): Promise<void> {
  * @param defaults - host routing and project-directory defaults.
  * @returns the ApiProxy implementation.
  */
-export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiProxy {  const sessionExportCompressionLevel = defaults.sessionExportCompressionLevel
+export function createApiProxy(
+  ctx: Context,
+  defaults: ApiProxyDefaults,
+): ApiProxy & { readonly sessionRuntime: SessionRuntime } {
+  const sessionExportCompressionLevel = defaults.sessionExportCompressionLevel
     ?? DEFAULT_SESSION_LOG_COMPRESSION_LEVEL
   const coldBlankProbeMaxBytes = defaults.coldBlankProbeMaxBytes
     ?? DEFAULT_COLD_BLANK_PROBE_MAX_BYTES
@@ -1410,6 +1433,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
   const presetSwitches = new Map<SessionId, Promise<unknown>>()
   /** Client-chosen identity creation/resume, deduplicated across concurrent retries. */
   const sessionCreations = new Map<SessionId, Promise<Agent>>()
+  /** Live AgentHandles owned by this gateway, keyed by session id. */
+  const sessionHandles = new Map<SessionId, AgentHandle>()
+  // A handle outlives the registry entry only until its owner's teardown
+  // dispatches; drop the map entry when the agent reports itself disposed.
+  ctx.on('agent/disposed', ({ agent }) => {
+    sessionHandles.delete(agent.id)
+  })
   /** Serializes path ownership and explicit title checks with Workspace mutations. */
   let workspaceCreationChain = Promise.resolve()
   const pendingQuestions = new Map<RpcId, PendingQuestion>()
@@ -1939,11 +1969,13 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           // session's history was produced under that composition, and
           // rebuilding it differently would replay tool calls the model can no
           // longer make.
-          return (await ctx.agents.resume({
+          const handle = await ctx.agents.resume({
             resumeSessionId: sessionId,
             agentOptions: agentOptions(),
             setup: (await composeAgent(storedPreset)).setup,
-          })).agent
+          })
+          sessionHandles.set(sessionId, handle)
+          return handle.agent
         }
 
         try {
@@ -1952,7 +1984,7 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
           throw new Error(`failed to ensure project directory "${cwd}": ${String(error)}`, { cause: error })
         }
         const composition = await composeAgent(presetId)
-        return (await ctx.agents.create({
+        const handle = await ctx.agents.create({
           sessionId,
           agentOptions: agentOptions(),
           meta: {
@@ -1960,7 +1992,9 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
             ...composition.agentPreset === undefined ? {} : { agentPreset: composition.agentPreset },
           },
           setup: composition.setup,
-        })).agent
+        })
+        sessionHandles.set(sessionId, handle)
+        return handle.agent
       })().catch((error: unknown) => {
         // Another Host entry path may have published the same identity while
         // this operation crossed an asynchronous persistence/filesystem step.
@@ -1989,6 +2023,33 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       throw new SessionCwdConflict(sessionId, cwd, agent.session.header.cwd)
     }
     return agent
+  }
+
+  /**
+   * Stop the live agent of one session and wait for its full teardown. The
+   * gateway owns every resumed/created AgentHandle, so this is the production
+   * equivalent of the reference `conversationService.stopSessionAndWait`:
+   * disposing the handle stops the loop, unregisters the agent, removes its
+   * live Session, and unwinds the scoped world. Queued inbox work dies with
+   * the runtime, exactly like killing the reference CLI subprocess.
+   * @param sessionId - the session whose live runtime to stop.
+   */
+  async function stopSessionAndWait(sessionId: SessionId): Promise<void> {
+    const handle = sessionHandles.get(sessionId)
+    if (handle !== undefined) {
+      sessionHandles.delete(sessionId)
+      handle.agent.inbox.clear()
+      await handle.dispose()
+      return
+    }
+    // Fallback for runtimes not created through this gateway (headless
+    // compositions): stop and drain the bare Agent at least.
+    const agent = ctx.agents.get(sessionId)
+    if (agent !== undefined) {
+      agent.inbox.clear()
+      agent.cancel({ kind: 'user' })
+      await agent.whenIdle()
+    }
   }
 
   /** Resolve or create one path while holding the Host's workspace-create chain. */
@@ -4184,6 +4245,10 @@ export function createApiProxy(ctx: Context, defaults: ApiProxyDefaults): ApiPro
       claimQuestion(pending, 'answered')
       pending.resolve(payload.answer)
       return Promise.resolve({ accepted: true })
+    },
+
+    sessionRuntime: {
+      stopSessionAndWait,
     },
   }
 }

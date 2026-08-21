@@ -56,11 +56,11 @@ describe('modality schema boundary', () => {
     providers: Record<string, { defaultInput?: unknown; models?: { input?: unknown }[] }>
   }
 
-  it('materializes an absent entry list as empty and an absent route list as text', () => {
+  it('materializes an absent entry list as empty and an absent route list as text + image', () => {
     // The empty-list inheritance rule exists because of exactly this: an entry
     // that declares nothing reaches resolution as `[]`, not as `undefined`.
     const absent = configWith({})() as Materialized
     expect(absent.providers['acme-gateway']?.models?.[0]?.input).toEqual([])
-    expect(absent.providers['acme-gateway']?.defaultInput).toEqual(['text'])
+    expect(absent.providers['acme-gateway']?.defaultInput).toEqual(['text', 'image'])
   })
 })

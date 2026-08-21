@@ -98,6 +98,17 @@ describe('ProjectionValueStore semantics', () => {
     expect(populated).not.toBe(empty)
     expect(store.values()).toBe(populated)
   })
+
+  it('clears only the named keys immediately', () => {
+    const store = new ProjectionValueStore()
+    store.apply('test/marks', { marks: ['a'] }, 1)
+    store.apply('other', 'kept', 2)
+
+    expect(store.clear(['missing'])).toBe(false)
+    expect(store.clear(['test/marks'])).toBe(true)
+    expect(store.get('test/marks')).toBeUndefined()
+    expect(store.get('other')).toBe('kept')
+  })
 })
 
 describe('Session tail-page seeding', () => {

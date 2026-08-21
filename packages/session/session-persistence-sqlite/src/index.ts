@@ -198,6 +198,10 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
+  override trim(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    return this.coordinator.trim(id, cutoffSeq, signal)
+  }
+
   // One method serves both public `list` and the backend hook; delegating it to
   // the coordinator would call this hook recursively.
 
@@ -235,6 +239,34 @@ export class SqliteSessionPersistence extends SessionPersistence implements Pers
     signal?.throwIfAborted()
     const { preserved } = scanRows(eventRows, fromSeq)
     return { meta, events: preserved }
+  }
+
+  /**
+   * Rewrite the stored log to keep only the committed events with
+   * `seq < cutoffSeq`: delete the removed rows and bump the session's
+   * revision token in one transaction, so revision-based readers re-read.
+   * @param id - the persisted session to trim.
+   * @param cutoffSeq - first event seq to remove (non-negative safe integer).
+   * @param signal - optional cancellation (checked at transaction boundaries).
+   * @returns the number of removed events.
+   */
+  async trimStored(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    signal?.throwIfAborted()
+    await this.ready
+    signal?.throwIfAborted()
+    const row = this.rowFor(id)
+    if (row === undefined) throw new Error(`session "${id}" not found`)
+    this.db.exec('BEGIN')
+    try {
+      const result = this.db.prepare('DELETE FROM events WHERE session_id = ? AND seq >= ?').run(id, cutoffSeq)
+      // The revision token must change so revision-based readers re-read.
+      this.db.prepare('UPDATE sessions SET revision = revision + 1 WHERE id = ?').run(id)
+      this.db.exec('COMMIT')
+      return { removedCount: Number(result.changes) }
+    } catch (error: unknown) {
+      this.db.exec('ROLLBACK')
+      throw error
+    }
   }
 
   /**

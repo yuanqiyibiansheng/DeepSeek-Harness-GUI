@@ -221,6 +221,27 @@ export abstract class SessionPersistence extends Service {
   Promise<{ meta: SessionHeader; events: SessionEvent[] }>
 
   /**
+   * Rewrite the stored log to keep only the committed events with
+   * `seq < cutoffSeq`, returning the number of removed events. The durable
+   * log is replaced atomically; the next {@link load} or {@link inspect}
+   * returns the trimmed log, and the next {@link append} continues from
+   * `cutoffSeq`.
+   *
+   * The session must have no live writer when the call returns: the caller
+   * stops and drains the owning agent and flushes before trimming, and the
+   * in-memory Session that owned the log must be discarded (disposed or the
+   * process restarted) — its continued seq would collide with the trimmed
+   * storage. The coordinator additionally drains any write-behind bound to
+   * the id and invalidates its cached state, so a quiescent caller sees the
+   * trimmed log immediately.
+   * @param id - the persisted session to trim.
+   * @param cutoffSeq - first event seq to remove; a non-negative safe integer.
+   * @param signal - optional cancellation for backend rewrite work.
+   * @returns the number of stored events removed.
+   */
+  abstract trim(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }>
+
+  /**
    * Lightweight listing from metadata, without a full-log parse.
    * @param signal - optional cancellation for backend listing work.
    * @returns one header per materialized session.

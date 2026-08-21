@@ -205,6 +205,28 @@ describe('scenario A: menu-pick /goal, type args, enter submits', () => {
   })
 })
 
+describe('rewind reset', () => {
+  it('clears draft text and draft images before a rewound session reopens', async () => {
+    const b = await scopedBench()
+    act(() => {
+      b.shell.setDraft('回滚前的草稿')
+      b.shell.addImages(['draft-1' as never, 'draft-2' as never])
+      b.shell.notify('error', '旧通知')
+    })
+    expect(b.shell.snapshot.draft).toBe('回滚前的草稿')
+    expect(b.shell.snapshot.imageIds).toEqual(['draft-1', 'draft-2'])
+    expect(b.view.getByText('旧通知')).toBeTruthy()
+
+    act(() => {
+      b.shell.actions.resetForRewind()
+    })
+
+    expect(b.shell.snapshot.draft).toBe('')
+    expect(b.shell.snapshot.imageIds).toEqual([])
+    expect(b.view.queryByText('旧通知')).toBeNull()
+  })
+})
+
 describe('scenario C: pasted /goal xxx + enter (menu never opened)', () => {
   it('adjudicates on enter, claims and submits in one stroke', async () => {
     const b = await bench()

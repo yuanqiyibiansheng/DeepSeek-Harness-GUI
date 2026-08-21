@@ -275,6 +275,7 @@ function makeHarness(init?: Partial<ConversationSnapshot>) {
       removeImage: () => {},
       pruneImages: () => {},
       submit: () => {},
+      resetForRewind: () => {},
     },
     useStore: bindSnapshotSelector(chat),
     actions: chat.actions,

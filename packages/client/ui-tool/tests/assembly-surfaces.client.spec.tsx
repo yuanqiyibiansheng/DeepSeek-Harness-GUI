@@ -5,6 +5,7 @@ import { cleanup, fireEvent, waitFor } from '@testing-library/react'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ISession, SessionId, TodoItem, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { FakeApiClient } from '../../runtime/tests/fake-api.client.ts'
 import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply as applyConversation, inject as injectConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { apply as applyTool, inject as injectTool } from '../src/client/apply.ts'
@@ -68,7 +69,8 @@ const LAYOUT_CHILDREN = {
 
 async function bench(nodes: ToolResultNode[]) {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  const api = new FakeApiClient()
+  runtime.provide('connection', { api, isLoopback: false })
   // ui-theme's Appearance row binds a durable scope through these two.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)

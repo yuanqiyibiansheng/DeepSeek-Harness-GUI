@@ -170,6 +170,9 @@
     - id: ui-theme
       name: '@deepseek-ai/dsh-client-ui-theme'
 
+    - id: ui-angelina
+      name: '@deepseek-ai/dsh-client-ui-angelina'
+
     - id: ui-skin-maid-atelier
       name: '@dsh-external/dsh-client-ui-skin-maid-atelier'
 
@@ -179,9 +182,6 @@
     - id: ui-layout
       name: '@deepseek-ai/dsh-client-ui-layout'
 
-    - id: ui-sidebar-toggle
-      name: '@deepseek-ai/dsh-client-ui-sidebar-toggle'
-
     # VSCode-style right sidebar workbench: explorer / editor / terminal / Git /
     # browser, isolated per conversation session (third-party bundle plugin).
     - id: better-sidebar
@@ -189,6 +189,9 @@
 
     - id: ui-sidebar
       name: '@deepseek-ai/dsh-client-ui-sidebar'
+
+    - id: ui-session-rewind
+      name: '@deepseek-ai/dsh-client-ui-session-rewind'
 
     - id: ui-settings
       name: '@deepseek-ai/dsh-client-ui-settings'
@@ -402,7 +405,8 @@
 # `.agents/notes/implemented/architecture/2026-08-10-host-plane-ownership-after-presets.md`.
 
 - id: compaction-basic
-  disabled: true
+  config:
+    auto: true
 
 - id: command-compact
   disabled: true

@@ -132,6 +132,7 @@ describe('render branch tails', () => {
           removeImage: () => {},
           pruneImages: () => {},
           submit: () => {},
+          resetForRewind: () => {},
         }}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}
@@ -189,6 +190,7 @@ describe('render branch tails', () => {
           removeImage: () => {},
           pruneImages: () => {},
           submit: () => {},
+          resetForRewind: () => {},
         }}
         useStore={bindSnapshotSelector(chat)}
         actions={chat.actions}

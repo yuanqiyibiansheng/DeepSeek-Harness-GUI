@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-/** AppearanceRow behavior: three cubes, selection follows the persisted
+/** AppearanceRow behavior: five cubes, selection follows the persisted
  * preference, clicks drive setTheme. */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -18,6 +18,14 @@ const COPY: Record<string, string> = {
   'appearance.dark': 'Dark',
   'appearance.system': 'System',
 }
+
+const OPTIONS = [
+  { id: 'light', label: 'Light', kind: 'light' as const },
+  { id: 'dark', label: 'Dark', kind: 'dark' as const },
+  { id: 'angelina-light', label: 'Angelina Light', kind: 'light' as const },
+  { id: 'angelina-dark', label: 'Angelina Dark', kind: 'dark' as const },
+  { id: 'system', label: 'System', kind: 'system' as const },
+]
 
 /** Empty global standard-kit hooks (the row reads neither). */
 function emptySessions() {
@@ -45,6 +53,7 @@ function mount(preference: ThemePreference = 'system') {
     actions: store.actions,
     t: (key: string) => COPY[key] ?? key,
     setTheme,
+    options: OPTIONS,
   }
   render(<AppearanceRow {...props} />)
   return { store, setTheme }
@@ -54,7 +63,7 @@ const pressed = (name: RegExp): string | null =>
   screen.getByRole('button', { name }).getAttribute('aria-pressed')
 
 describe('AppearanceRow', () => {
-  it('renders the title and three cubes with the preference cube selected', () => {
+  it('renders the title and five cubes with the preference cube selected', () => {
     mount('dark')
     expect(screen.getByText('Appearance')).toBeDefined()
     expect(pressed(/Dark/)).toBe('true')

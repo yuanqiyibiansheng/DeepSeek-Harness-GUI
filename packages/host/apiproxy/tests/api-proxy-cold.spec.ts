@@ -10,11 +10,10 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SessionStore from '@deepseek-ai/dsh-session'
-import AgentRegistry from '@deepseek-ai/dsh-agent'
+import AgentRegistry, { Inbox } from '@deepseek-ai/dsh-agent'
 import { TypertLookupFailure } from '@deepseek-ai/dsh-typert-protocol'
 import TypertRegistry from '@deepseek-ai/dsh-typert-registry'
 import { createUserMessage, MessageId } from '@deepseek-ai/dsh-llm'
-import type { Agent } from '@deepseek-ai/dsh-agent'
 import UserQuestionService from '@deepseek-ai/dsh-user-questions'
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -26,6 +25,7 @@ import {
 import type { RpcRequest } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { RpcId } from '@deepseek-ai/dsh-host-apiproxy/api/rpc'
 import { createApiProxy } from '@deepseek-ai/dsh-host-apiproxy'
+import type { Agent } from '@deepseek-ai/dsh-agent'
 
 const sid = (id: string): SessionId => id as SessionId
 
@@ -37,6 +37,42 @@ function request<P>(payload: P): RpcRequest<P> {
 function header(id: string, createdAt: number, extra: Partial<SessionHeader> = {}): SessionHeader {
   return { version: 0, id: sid(id), createdAt, cwd: '/proj', ...extra }
 }
+
+describe('session runtime teardown', () => {
+  it('clears queued inbox work before reopening a rewound session', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(UserQuestionService)
+    await ctx.plugin(AgentRegistry)
+    const api = createApiProxy(ctx, {
+      defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
+      cwd: '/tmp',
+    })
+    const session = ctx.sessions.create(sid('rewind-queue'), { meta: { createdAt: 100, cwd: '/proj' } })
+    const inbox = new Inbox(session, { inserted: () => {}, discarded: () => {}, claimed: () => {} })
+    const agent = {
+      id: session.id,
+      session,
+      inbox,
+      status: 'idle',
+      ctx,
+      cancel: () => {},
+      whenIdle: async () => {},
+    } as unknown as Agent
+    ctx.agents.register(agent)
+
+    inbox.append('next-turn', createUserMessage({
+      content: [{ type: 'text', text: 'queued before rewind' }],
+      source: { kind: 'user' },
+    }))
+    expect(agent.inbox.nextTurn).toHaveLength(1)
+
+    await api.sessionRuntime.stopSessionAndWait(session.id)
+
+    expect(agent.inbox.nextTurn).toHaveLength(0)
+    expect(agent.inbox.nextStep).toHaveLength(0)
+  })
+})
 
 describe('sessions.list cold merge', () => {
   it('verifies only small possibly-blank artifacts and treats every unavailable probe as visible', async () => {
@@ -284,6 +320,7 @@ describe('cold history recovery view', () => {
       ),
       appendBatch: () => Promise.resolve(),
       commitRepair: () => Promise.resolve(),
+      trimStored: () => Promise.resolve({ removedCount: 0 }),
       list: () => Promise.resolve([structuredClone(meta)]),
     }
     const coordinator = new PersistenceCoordinator(ctx, backend)

@@ -106,6 +106,10 @@ describe('LlmRuntime', () => {
     expect(isContextWindowExceededError('input is too long for this model')).toBe(true)
     expect(isContextWindowExceededError('request too large for model context')).toBe(true)
     expect(isContextWindowExceededError('input exceeds the model context window limit')).toBe(true)
+    // DeepSeek's exact overflow detail, and the generic request-size wording it
+    // is the sole surviving case of under the stricter classifier rules below.
+    expect(isContextWindowExceededError('input token exceed the limit')).toBe(true)
+    expect(isContextWindowExceededError('input tokens exceed')).toBe(true)
   })
 
   it('does not mistake unrelated input validation for context-window overflow', () => {

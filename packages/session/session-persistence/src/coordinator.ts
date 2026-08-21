@@ -207,6 +207,19 @@ export interface PersistenceBackend<TornMarker = unknown> {
   locate?(meta: SessionHeader): SessionLocation | undefined
 
   /**
+   * Rewrite the stored log to keep only the committed events with
+   * `seq < cutoffSeq`, atomically. Returns the number of removed events. The
+   * backend owns the physical representation (frame/row encoding); the
+   * coordinator drains write-behind and invalidates cached state around it.
+   * Named distinctly from the service's `trim` (which delegates to the
+   * coordinator) per the hook-naming convention (`loadStored`, `appendBatch`).
+   * @param id - persisted session id to trim.
+   * @param cutoffSeq - first event seq to remove (non-negative safe integer).
+   * @param signal - optional cancellation for backend rewrite work.
+   */
+  trimStored(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }>
+
+  /**
    * Optional lifecycle teardown (e.g. close a database handle). Awaited by the
    * coordinator's dispose effect AFTER the quiescence drain. A stateless file
    * backend omits it.
@@ -867,6 +880,47 @@ export class PersistenceCoordinator<TornMarker = unknown> {
     const whole = await this.readStoredPrefix(id, signal)
     // Sequential fallback: contiguous seqs from 0 make the suffix an index slice.
     return { meta: whole.meta, events: whole.events.slice(fromSeq) }
+  }
+
+  /**
+   * Rewrite the stored log to keep only the committed events with
+   * `seq < cutoffSeq`.
+   * @param id - the persisted session to trim.
+   * @param cutoffSeq - first event seq to remove (non-negative safe integer).
+   * @param signal - optional cancellation for backend rewrite work.
+   * @returns the number of removed events.
+   */
+  trim(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    if (!Number.isSafeInteger(cutoffSeq) || cutoffSeq < 0) {
+      return Promise.reject(new TypeError(`trim cutoffSeq must be a non-negative safe integer, got ${String(cutoffSeq)}`))
+    }
+    const retired = Promise.resolve(this.retirements.get(id))
+    const waited = signal === undefined ? retired : observeQueuedAbort(retired, signal, () => false)
+    return waited.then(() => this.serialize(id, () => this.trimCore(id, cutoffSeq, signal), signal))
+  }
+
+  private async trimCore(
+    id: SessionId,
+    cutoffSeq: number,
+    signal?: AbortSignal,
+  ): Promise<{ removedCount: number }> {
+    signal?.throwIfAborted()
+    // Drain any live write-behind bound to this id so no buffered event is
+    // cut incorrectly or re-appended after the rewrite. The caller stops and
+    // drains the owning agent first; this is the coordinator-level net.
+    for (const [session, live] of this.live) {
+      if (session.id !== id) continue
+      await live.writes.flush()
+    }
+    signal?.throwIfAborted()
+    const removed = await this.backend.trimStored(id, cutoffSeq, signal)
+    // Drop coordinator-owned state so the next load/inspect/prepare re-reads
+    // the trimmed log instead of serving a pre-trim cache. A stale live
+    // Session's continued appends then adopt the trimmed cursor and reject on
+    // the seq-contiguity check rather than corrupting the trimmed log.
+    this.states.delete(id)
+    this.preparations.invalidate(id)
+    return removed
   }
 
   /** Read one detached physical prefix without logical recovery or caching. */

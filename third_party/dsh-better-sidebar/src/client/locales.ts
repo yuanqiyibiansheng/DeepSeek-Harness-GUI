@@ -130,6 +130,8 @@ export const zh = {
   settingsJobsDesc: '当前会话出现新的后台任务时，自动展开侧边栏并打开后台任务页（每个新任务都会触发）；关闭后需手动打开',
   settingsToolsTitle: '为模型注入终端工具',
   settingsToolsDesc: '开启后，模型可通过 terminal_create 等 8 个工具创建并操作侧边栏终端（默认关闭）',
+  settingsPresetManagerTitle: '显示 Agent 预设管理',
+  settingsPresetManagerDesc: '在设置中显示 Agent 预设管理页；仅影响入口，不改变预设继承',
   settingsBottomTerminalTitle: '底部面板首次展开自动开终端',
   settingsBottomTerminalDesc: '每次会话中第一次展开底部面板时，尝试在底部面板自动打开一个新终端标签（终端数量上限仍会限制；默认开启）',
   settingsFontFamilyTitle: '终端字体',

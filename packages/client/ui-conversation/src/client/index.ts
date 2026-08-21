@@ -41,5 +41,9 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     /** The outward face only; the concrete service stays inside this plugin. */
     conversation: import('./service.ts').IConversation
+    /** Session-local input maintenance owned by ui-conversation. */
+    conversationInput: {
+      resetForRewind(sessionId: import('@deepseek-ai/dsh-client-runtime/client').SessionId): void
+    }
   }
 }

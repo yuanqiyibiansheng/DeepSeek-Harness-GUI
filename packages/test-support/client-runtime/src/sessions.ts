@@ -184,7 +184,7 @@ export class TestSessions implements ISessions {
 
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
-    method: 'open' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents'
+    method: 'open' | 'reopen' | 'resync' | 'openSubagent' | 'setSubagentCatalogOpen' | 'refreshSubagents'
       | 'clear' | 'search' | 'fork'
     args: unknown[]
   }[] = []
@@ -411,6 +411,29 @@ export class TestSessions implements ISessions {
       draft.current = id
       draft.currentAddress = undefined
     })
+  }
+
+  /**
+   * Test mirror of the production in-place rebuild: reselect the fixture
+   * session (the double keeps one behavior face per fixture, so there is no
+   * separate instance to recreate).
+   * @param id - session id to rebuild in place.
+   */
+  async reopen(id: SessionId): Promise<void> {
+    this.calls.push({ method: 'reopen', args: [id] })
+    this.require(id)
+    await this.stabilize(() => {
+      this.list.update((draft) => {
+        draft.current = id
+        draft.currentAddress = undefined
+      })
+    })
+  }
+
+  /** Record a formal reconnect rebuild request for one fixture session. */
+  async resync(id: SessionId): Promise<void> {
+    this.calls.push({ method: 'resync', args: [id] })
+    this.require(id)
   }
 
   /** Open an existing fixture through its catalog address. */

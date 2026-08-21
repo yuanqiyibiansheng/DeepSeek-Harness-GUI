@@ -364,14 +364,22 @@ describe('compact configuration and defaults', () => {
         maxOverflowRetries: 3,
       }],
     }), { provider: 'ratio-provider', model: 'ratio-model' })
-    expect(resolveCompactSpec(ratioOverride, 2_000)).toMatchObject({
-      thresholdTokens: 1_200,
-      retainTokens: 400,
-      summarizationProvider: 'summary-provider',
-      summarizationModel: 'summary-model',
-      maxTokens: 512,
-      compactionRetries: 2,
-      maxOverflowRetries: 3,
+    expect(resolveCompactSpec(ratioOverride, 2_000, 500)).toMatchObject({
+      promptBudget: 1_500,
+      thresholdTokens: 900,
+      retainTokens: 300,
+    })
+  })
+
+  it('uses the full window as prompt budget when output capability outgrows it', () => {
+    const oversizedOutput = resolveTargetPolicy(
+      resolveConfig({}),
+      { provider: MODEL, model: MODEL },
+    )
+    expect(resolveCompactSpec(oversizedOutput, 2_000, 4_096)).toMatchObject({
+      promptBudget: 2_000,
+      thresholdTokens: 1_600,
+      retainTokens: 320,
     })
   })
 

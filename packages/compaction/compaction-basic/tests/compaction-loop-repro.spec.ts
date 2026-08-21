@@ -47,6 +47,7 @@ class StepwiseToolAdapter extends LlmAdapter {
       id: model,
       name: model,
       context: { contextWindow: 400 },
+      maxTokens: 100,
     })
   }
 
@@ -92,6 +93,7 @@ class OverflowRecoveryAdapter extends LlmAdapter {
       id: model,
       name: model,
       context: { contextWindow: 128 },
+      maxTokens: 32,
     })
   }
 

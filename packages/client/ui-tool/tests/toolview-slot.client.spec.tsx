@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import type { ISession, SessionId, ToolResultNode } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import { FakeApiClient } from '../../runtime/tests/fake-api.client.ts'
 import { SlotTestRuntime, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as applyConversation, inject as injectConversation } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -64,7 +65,8 @@ const LAYOUT_CHILDREN = {
  */
 async function bench(nodes: ToolResultNode[]) {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  const api = new FakeApiClient()
+  runtime.provide('connection', { api, isLoopback: false })
   // ui-theme's Appearance row binds a durable scope through these two.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
@@ -203,7 +205,8 @@ describe('keyed toolview hole through the real machinery', () => {
 describe('registrant declaration injection', () => {
   it('runs a registrant before ui-tool and waits on the actual toolview declaration', async () => {
     const runtime = await SlotTestRuntime.create()
-    runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+    const api = new FakeApiClient()
+  runtime.provide('connection', { api, isLoopback: false })
     // ui-theme's Appearance row binds a durable scope through these two.
     runtime.provide('remote', { $on: () => () => {} })
     runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)

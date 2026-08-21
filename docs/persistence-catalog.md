@@ -405,6 +405,34 @@ Source: [`packages/compaction/compaction/src/types.ts:33`](../packages/compactio
 
 Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedback/command-feedback/src/index.ts)
 
+### `file/*`
+
+<a id="filehistory-snapshot--log-only"></a>
+
+#### `file/history-snapshot` — log-only
+
+```ts persistence-catalog
+/**
+ * File-history recording for one user message: the turn-start snapshot
+ * (`isSnapshotUpdate: false`) or a mid-turn per-edit update
+ * (`isSnapshotUpdate: true`). Both carry the complete per-path map known
+ * at append time; the read side folds per `userMessageSeq`, later events
+ * winning per path. Log-only UI/safety metadata: never model-visible,
+ * never surface-eligible, and written with the envelope's `ignorable`
+ * marker so an older runtime skips it instead of refusing the log.
+ */
+'file/history-snapshot': {
+  /** Seq of the `user/message` event this recording belongs to. */
+  userMessageSeq: number
+  /** Per-path backup identities, complete at append time. */
+  trackedFileBackups: Record<string, FileHistoryBackup>
+  /** True for a mid-turn per-edit update; false for the turn-start snapshot. */
+  isSnapshotUpdate: boolean
+}
+```
+
+Source: [`packages/rewind/file-history/src/types.ts:48`](../packages/rewind/file-history/src/types.ts)
+
 ### `goal/*`
 
 <a id="goalchange--log-only"></a>
@@ -929,6 +957,19 @@ Source: [`packages/core/session/src/types.ts:243`](../packages/core/session/src/
 ```
 
 Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/types.ts)
+
+### `vision/*`
+
+<a id="visionobservation--log-only"></a>
+
+#### `vision/observation` — log-only
+
+```ts persistence-catalog
+/** Exact Bailian observation used to replace one model-visible image. */
+'vision/observation': VisionObservationEventData
+```
+
+Source: [`packages/host/apiproxy/src/vision-enhancement.ts:74`](../packages/host/apiproxy/src/vision-enhancement.ts)
 
 ### `web/*`
 
