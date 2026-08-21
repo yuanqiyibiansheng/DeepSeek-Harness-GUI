@@ -70,6 +70,7 @@ async function harness(image?: StoredImageAttachment): Promise<Context> {
         maxImagesPerMessage: 1,
         maxMessageImageBytes: fixture.data.byteLength,
         maxImagePixels: fixture.ref.width * fixture.ref.height,
+        maxImageDimension: 8192,
         mediaTypes: [fixture.ref.mediaType],
       }
 

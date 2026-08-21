@@ -39,8 +39,11 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 
-# Local build artifacts and logs (not source; kept out of the repo)
+# Local build artifacts and helper scripts
 *.log
+uninstall.obj
+_collect_deps.ps1
+_check_deps.ps1
+
 apps/desktop-installer/src-tauri/gen/
 apps/desktop-installer/src-tauri/uninstall.exe
-uninstall.obj

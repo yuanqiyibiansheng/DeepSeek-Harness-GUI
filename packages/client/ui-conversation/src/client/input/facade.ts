@@ -10,7 +10,7 @@ import type { ClientContext, ObservableSnapshot, SnapshotStore } from '@deepseek
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ArbitrateKey, ArbitrateOutcome, CommandClaim, ConsumeTokenRequest, PickOutcome,
-  ReferenceInsert, InputTriggerController, TokenSpan,
+  ReferenceInsert, InputTriggerController, SubmitImageAttachment, TokenSpan,
 } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {
   DraftAttachmentId, EditRange, EditSelection, InputActions, InputEffect, InputNotice, InputState,
@@ -44,8 +44,19 @@ export interface SessionInputDeps {
    * order (the empty-draft accelerated-Enter gesture); absent = unsupported.
    */
   steerQueue?: (() => void) | undefined
-  /** The plain-message sink (send choreography / materialize fork — the hub owns it). */
+  /**
+   * The plain-message sink (send choreography / materialize fork — the hub owns it).
+   */
   defaultSink(text: string, imageIds: readonly DraftAttachmentId[], mode: InputSubmitMode): void
+  /**
+   * Command-attachment face: serialize draft image ids to base64 attachment
+   * payloads for the claimed command, and release them after a successful
+   * command submit. Owned by the hub (backed by the conversation service).
+   */
+  commandImages: {
+    serialize(ids: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]>
+    release(ids: readonly DraftAttachmentId[]): void
+  }
 }
 
 /** Guard tier from the machine phase. */
@@ -464,7 +475,7 @@ export class SessionInputShell implements SessionInput {
       this.run(this.core.dispatch({ type: 'adjudicated', attempt, outcome: undefined }))
       return
     }
-    inputTriggers.adjudicate(draft.trim(), attempt.signal).then(
+    inputTriggers.adjudicate(draft.trim(), attempt.signal, { images: this.imageIds.length }).then(
       (outcome: PickOutcome) => {
         if (this.dead(attempt)) return
         this.run(this.core.dispatch({ type: 'adjudicated', attempt, outcome }))
@@ -479,11 +490,20 @@ export class SessionInputShell implements SessionInput {
 
   /** The submit transaction: claim.submit against the session scope; ok maps from the outcome kind. */
   private beginSubmit(attempt: SubmitAttempt, claim: CommandClaim, args: string): void {
+    const imageIds = claim.images === true ? [...this.imageIds] : []
     Promise.resolve()
-      .then(() => claim.submit(args, this.deps.actx))
+      .then(async () => {
+        const images = imageIds.length > 0 ? await this.deps.commandImages.serialize(imageIds) : []
+        return claim.submit(args, this.deps.actx, images)
+      })
       .then(
         (outcome) => {
           if (this.dead(attempt)) return
+          if (outcome.kind === 'success' && imageIds.length > 0) {
+            const submitted = new Set(imageIds)
+            this.imageIds = this.imageIds.filter(id => !submitted.has(id))
+            this.deps.commandImages.release(imageIds)
+          }
           this.run(this.core.dispatch({
             type: 'submit-settled', attempt, ok: outcome.kind === 'success', outcome,
           }))

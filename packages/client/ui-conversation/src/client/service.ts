@@ -14,6 +14,7 @@ import type { Context } from '@deepseek-ai/cordis'
 // method) instead of the standalone helper.
 import type { ISessions, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ImageAttachmentRef, ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import type { SubmitImageAttachment } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { ComposerAttachment } from './contract/slots.ts'
 import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'
@@ -154,6 +155,20 @@ export class ConversationController extends Service implements IConversation {
     const result = await session.prompt(content, mode)
     if (!result.ok) throw new Error(`conversation.send failed: ${result.error.code}: ${result.error.message}`)
     this.releaseDraftImages(attachments)
+  }
+
+  /**
+   * Serialize ordered draft image ids into base64 command-attachment payloads
+   * for a claimed slash command that accepts images.
+   * @param ids - ordered draft-local attachment ids.
+   * @returns base64 attachments in submission order.
+   */
+  async serializeCommandImages(ids: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]> {
+    const attachments = this.draftImages(ids)
+    if (attachments.length !== ids.length) {
+      throw new Error('conversation.serializeCommandImages: one or more draft images are no longer available')
+    }
+    return this.serializeCommandAttachments(attachments)
   }
 
   /**
@@ -319,6 +334,15 @@ export class ConversationController extends Service implements IConversation {
       mediaType: imageMediaType(file.type),
       data: bytesToBase64(new Uint8Array(await file.arrayBuffer())),
       ...(file.name === '' ? {} : { name: file.name }),
+    })))
+  }
+
+  /** Convert browser draft attachments to base64 command-attachment payloads. */
+  private serializeCommandAttachments(attachments: readonly ComposerAttachment[]): Promise<readonly SubmitImageAttachment[]> {
+    return Promise.all(attachments.map(async attachment => ({
+      mediaType: imageMediaType(attachment.file.type),
+      data: bytesToBase64(new Uint8Array(await attachment.file.arrayBuffer())),
+      ...(attachment.file.name === '' ? {} : { name: attachment.file.name }),
     })))
   }
 }

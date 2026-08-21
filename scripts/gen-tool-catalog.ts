@@ -72,6 +72,7 @@ class CatalogAttachmentStore extends AttachmentStore {
     maxImagesPerMessage: 1,
     maxMessageImageBytes: 1,
     maxImagePixels: 1,
+    maxImageDimension: 8192,
     mediaTypes: Object.freeze(['image/png'] as const),
   })
 

@@ -82,6 +82,11 @@
       "@deepseek-ai/dsh-commands/types": ["./packages/interaction/commands/src/types.ts"],
       "@deepseek-ai/dsh-jobs/brand": ["./packages/jobs/jobs/src/brand.ts"],
       "@deepseek-ai/dsh-credentials/types": ["./packages/credentials/credentials/src/types.ts"],
+      "@deepseek-ai/dsh-attachment": ["./packages/attachment/attachment/src/index.ts"],
+      "@deepseek-ai/dsh-attachment/types": ["./packages/attachment/attachment/src/types.ts"],
+      "@deepseek-ai/dsh-attachment/admission": ["./packages/attachment/attachment/src/admission.ts"],
+      "@deepseek-ai/dsh-attachment/invariant": ["./packages/attachment/attachment/src/invariant.ts"],
+      "@deepseek-ai/dsh-attachment/brand": ["./packages/attachment/attachment/src/brand.ts"],
       "@deepseek-ai/dsh-settings/types": ["./packages/settings/settings/src/types.ts"],
       "@deepseek-ai/dsh-api-remotes/types": ["./packages/api/remotes/src/types.ts"],
       "@deepseek-ai/dsh-api-remotes/invariant": ["./packages/api/remotes/src/invariant.ts"],
@@ -158,7 +163,7 @@
       // dir names are unique across groups, so first-on-disk-wins resolution is
       // unambiguous; adding a package under an existing group needs no edit
       // here. The aggregates' project references (tsconfig.host.json /
-      // tsconfig.client.json) stay explicit — TS project references have no
+      // tsconfig.client.json) stay explicit �?TS project references have no
       // wildcard form.
       "@deepseek-ai/dsh-host-apiproxy": ["./packages/host/apiproxy/src"],
       "@deepseek-ai/dsh-host-directory-picker": ["./packages/host/directory-picker/src"],

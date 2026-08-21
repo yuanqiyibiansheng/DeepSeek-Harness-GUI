@@ -297,9 +297,9 @@ describe('decorations (bare-invocation UI on host commands)', () => {
     command.decorate(goalDecoration())
     const scope = mint('s1')
     await warm(proj('s1'))
-    expect(await source.matchEnter!(proj('s1'), '/goal', new AbortController().signal)).toBe('handled')
+    expect(await source.matchEnter!(proj('s1'), '/goal', new AbortController().signal, { images: 0 })).toBe('handled')
     expect(command.popupFor(scope.ctx).state.getSnapshot()).toMatchObject({ open: true, command: 'goal' })
-    const argued = await source.matchEnter!(proj('s1'), '/goal ship it', new AbortController().signal)
+    const argued = await source.matchEnter!(proj('s1'), '/goal ship it', new AbortController().signal, { images: 0 })
     if (argued === undefined || argued === 'handled' || !('claim' in argued)) throw new Error('expected the host claim')
     expect(argued.claim.token).toBe('/goal ')
   })
@@ -318,7 +318,7 @@ describe('decorations (bare-invocation UI on host commands)', () => {
     command.decorate(goalDecoration({ name: 'phantom' }))
     const scope = mint('s1')
     await warm(proj('s1'))
-    expect(await source.matchEnter!(proj('s1'), '/phantom', new AbortController().signal)).toBeUndefined()
+    expect(await source.matchEnter!(proj('s1'), '/phantom', new AbortController().signal, { images: 0 })).toBeUndefined()
     expect(menuPick(source, 'phantom', proj('s1'))).toBeUndefined()
     expect(command.popupFor(scope.ctx).state.getSnapshot().open).toBe(false)
   })
@@ -327,7 +327,7 @@ describe('decorations (bare-invocation UI on host commands)', () => {
     const { command, source, warm, executeCalls } = await bench()
     command.decorate(goalDecoration({ name: 'plan', available: () => false }))
     await warm(proj('s1'))
-    expect(await source.matchEnter!(proj('s1'), '/plan', new AbortController().signal)).toBe('handled')
+    expect(await source.matchEnter!(proj('s1'), '/plan', new AbortController().signal, { images: 0 })).toBe('handled')
     expect(executeCalls).toEqual([{ sessionId: sid('s1'), line: '/plan' }])
   })
 
@@ -440,7 +440,7 @@ describe('matchEnter (enter column)', () => {
     const { source } = await bench({
       commands: () => new Promise((resolve) => { release = resolve }),
     })
-    const wait = source.matchEnter!(proj('s1'), '/goal args', signal())
+    const wait = source.matchEnter!(proj('s1'), '/goal args', signal(), { images: 0 })
     release({ commands: S1_CMDS })
     const outcome = await wait
     if (outcome === undefined || outcome === 'handled' || !('claim' in outcome)) throw new Error('expected claim')
@@ -451,14 +451,14 @@ describe('matchEnter (enter column)', () => {
     const { source } = await bench({
       commands: () => Promise.reject(new Error('warmup boom')),
     })
-    await expect(source.matchEnter!(proj('s1'), '/goal', signal())).rejects.toThrow('warmup boom')
+    await expect(source.matchEnter!(proj('s1'), '/goal', signal(), { images: 0 })).rejects.toThrow('warmup boom')
   })
 
   it('leadingInput claims args-tolerant (bare and with trailing text)', async () => {
     const { source, warm } = await bench()
     await warm(proj('s1'))
     for (const line of ['/goal', '/goal refactor the loop']) {
-      const outcome = await source.matchEnter!(proj('s1'), line, signal())
+      const outcome = await source.matchEnter!(proj('s1'), line, signal(), { images: 0 })
       if (outcome === undefined || outcome === 'handled' || !('claim' in outcome)) throw new Error('expected claim')
       expect(outcome.claim.token).toBe('/goal ')
     }
@@ -473,7 +473,7 @@ describe('matchEnter (enter column)', () => {
       return true
     })
     await warm(proj('s1'))
-    await expect(source.matchEnter!(proj('s1'), '/plan', signal())).resolves.toBe('handled')
+    await expect(source.matchEnter!(proj('s1'), '/plan', signal(), { images: 0 })).resolves.toBe('handled')
     expect(consumes).toEqual([{ guard: { kind: 'bare-token', token: '/plan' } }])
     await Promise.resolve()
     expect(executeCalls).toEqual([{ sessionId: sid('s1'), line: '/plan' }])
@@ -482,7 +482,7 @@ describe('matchEnter (enter column)', () => {
   it('bare kind with trailing text → undefined and no RPC (default sink owns the line)', async () => {
     const { source, warm, executeCalls } = await bench()
     await warm(proj('s1'))
-    await expect(source.matchEnter!(proj('s1'), '/plan now', signal())).resolves.toBeUndefined()
+    await expect(source.matchEnter!(proj('s1'), '/plan now', signal(), { images: 0 })).resolves.toBeUndefined()
     expect(executeCalls).toEqual([])
   })
 
@@ -490,18 +490,18 @@ describe('matchEnter (enter column)', () => {
     const { command, source, mint, listCalls } = await bench()
     command.register(themeContribution())
     const scope = mint('s1')
-    await expect(source.matchEnter!(proj('s1'), '/theme', signal())).resolves.toBe('handled')
+    await expect(source.matchEnter!(proj('s1'), '/theme', signal(), { images: 0 })).resolves.toBe('handled')
     expect(command.popupFor(scope.ctx).state.getSnapshot().open).toBe(true)
     expect(listCalls).toEqual([]) // contribution short-circuits ahead of ensureReady
-    await expect(source.matchEnter!(proj('s1'), '/theme dark', signal())).resolves.toBeUndefined()
+    await expect(source.matchEnter!(proj('s1'), '/theme dark', signal(), { images: 0 })).resolves.toBeUndefined()
   })
 
   it('unknown name, bare "/", and non-slash lines → undefined', async () => {
     const { source, warm } = await bench()
     await warm(proj('s1'))
-    await expect(source.matchEnter!(proj('s1'), '/nope', signal())).resolves.toBeUndefined()
-    await expect(source.matchEnter!(proj('s1'), '/', signal())).resolves.toBeUndefined()
-    await expect(source.matchEnter!(proj('s1'), 'plain text', signal())).resolves.toBeUndefined()
+    await expect(source.matchEnter!(proj('s1'), '/nope', signal(), { images: 0 })).resolves.toBeUndefined()
+    await expect(source.matchEnter!(proj('s1'), '/', signal(), { images: 0 })).resolves.toBeUndefined()
+    await expect(source.matchEnter!(proj('s1'), 'plain text', signal(), { images: 0 })).resolves.toBeUndefined()
   })
 })
 
@@ -513,7 +513,7 @@ describe('execute payload', () => {
     await warm(proj('s1'))
     const outcome = source.matchSpace!(proj('s1'), '/goal')
     if (outcome === undefined || outcome === 'handled' || !('claim' in outcome)) throw new Error('expected claim')
-    const settled = await outcome.claim.submit('ship it', new Context())
+    const settled = await outcome.claim.submit('ship it', new Context(), [])
     expect(executeCalls).toEqual([{ sessionId: sid('s1'), line: '/goal ship it' }])
     // Pure admission: no outcome text ever rides the submit result — the
     // durable command lifecycle events render the outcome in the flow.
@@ -539,7 +539,7 @@ describe('execute payload', () => {
     b.ctx.on('command/executed', rejectingListener)
     b.ctx.on('command/executed', after)
 
-    await expect(outcome.claim.submit('ship it', new Context())).resolves.toEqual({ kind: 'success' })
+    await expect(outcome.claim.submit('ship it', new Context(), [])).resolves.toEqual({ kind: 'success' })
     expect(after).toHaveBeenCalledOnce()
     await Promise.resolve()
     await Promise.resolve()
@@ -557,10 +557,10 @@ describe('execute payload', () => {
       return outcome.claim
     }
     const first = await claimOf({ execute: () => Promise.resolve({ matched: false }) })
-    const bad = await first.submit('x', new Context())
+    const bad = await first.submit('x', new Context(), [])
     expect(bad.kind).toBe('error')
     const second = await claimOf({ execute: () => Promise.resolve({ matched: true }) })
-    await expect(second.submit('', new Context())).resolves.toEqual({ kind: 'success' })
+    await expect(second.submit('', new Context(), [])).resolves.toEqual({ kind: 'success' })
   })
 })
 
@@ -584,7 +584,7 @@ describe('detached admission notices', () => {
 
     // Admission miss (matched:false): immediate composer feedback stays.
     mode = 'miss'
-    await source.matchEnter!(proj('s1'), '/plan', new AbortController().signal)
+    await source.matchEnter!(proj('s1'), '/plan', new AbortController().signal, { images: 0 })
     await flush()
     expect(notices).toEqual([{ scope: sid('s1'), level: 'error', text: 'unknown or malformed command: /plan' }])
 
@@ -663,7 +663,7 @@ describe('popupFor', () => {
       consumes.push(r)
       return true
     })
-    await source.matchEnter!(proj('s1'), '/theme', new AbortController().signal)
+    await source.matchEnter!(proj('s1'), '/theme', new AbortController().signal, { images: 0 })
     const popup = command.popupFor(scope.ctx)
     await Promise.resolve()
     await popup.select(0)
@@ -674,7 +674,7 @@ describe('popupFor', () => {
     const { command, source, mint } = await bench()
     command.register(themeContribution())
     const scope = mint('s1')
-    await source.matchEnter!(proj('s1'), '/theme', new AbortController().signal)
+    await source.matchEnter!(proj('s1'), '/theme', new AbortController().signal, { images: 0 })
     const popup = command.popupFor(scope.ctx)
     expect(popup.state.getSnapshot().open).toBe(true)
 

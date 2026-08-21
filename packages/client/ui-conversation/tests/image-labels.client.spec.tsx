@@ -32,6 +32,7 @@ describe('attachment rejection copy', () => {
     maxImagesPerMessage: 20,
     maxMessageImageBytes: 100 * 1024 * 1024,
     maxImagePixels: 40_000_000,
+    maxImageDimension: 8192,
     mediaTypes: ['image/png'] as const,
   }
 

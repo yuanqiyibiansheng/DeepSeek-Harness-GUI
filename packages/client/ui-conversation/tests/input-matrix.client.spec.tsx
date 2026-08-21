@@ -70,7 +70,7 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
 
 function bench(over?: { running?: boolean; disabled?: boolean; submit?: (args: string) => Promise<SubmitOutcome> }) {
   const sink = vi.fn()
-  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink })
+  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink, commandImages: { serialize: () => Promise.resolve([]), release: () => undefined } })
   const wiring = shell
   const view = mountBar(shell, over)
   const textarea = view.container.querySelector('textarea')!

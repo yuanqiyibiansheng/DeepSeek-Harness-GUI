@@ -336,6 +336,7 @@ describe('argument and service preconditions', () => {
         maxImagesPerMessage: 1,
         maxMessageImageBytes: 1024,
         maxImagePixels: 100,
+        maxImageDimension: 8192,
         mediaTypes: Object.freeze(['image/jpeg'] as const),
       })
 
@@ -415,6 +416,7 @@ describe('image admission failures', () => {
         maxImagesPerMessage: 1,
         maxMessageImageBytes: 1024,
         maxImagePixels: 100,
+        maxImageDimension: 8192,
         mediaTypes: Object.freeze(['image/png'] as const),
       })
 

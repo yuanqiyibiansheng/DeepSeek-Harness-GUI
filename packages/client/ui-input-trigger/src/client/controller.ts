@@ -13,7 +13,7 @@ import { detectTrigger } from '../core/detect.ts'
 import { MENU_CLOSED, menuReduce, seedGroups } from '../core/menu.ts'
 import type { MenuEvent, MenuState, TriggerHit } from '../core/contract.ts'
 import type {
-  ArbitrateKey, ArbitrateOutcome, ClientSessionContext, PickOutcome, InputTriggerSource, TriggerChar, TriggerGuard,
+  ArbitrateKey, ArbitrateOutcome, ClientSessionContext, PickOutcome, InputTriggerSource, SubmitEnvelope, TriggerChar, TriggerGuard,
 } from '../types.ts'
 
 /** Roster access the controller borrows from the root service (registration order preserved). */
@@ -248,17 +248,19 @@ export class InputTriggerController {
    * input machine applies it inside the same submit attempt — no event).
    * @param line - trimmed draft; the leading char selects the trigger roster.
    * @param signal - attempt-scoped abort from the input machine.
+   * @param envelope - non-text submission state accompanying the draft.
    * @returns the winning outcome or undefined (default sink). Rejects when a
-   * polled source's warmup fails — the caller must not silently downgrade.
+   * polled source's warmup fails or the winning source refuses the envelope —
+   * the caller must not silently downgrade.
    */
-  async adjudicate(line: string, signal: AbortSignal): Promise<PickOutcome> {
+  async adjudicate(line: string, signal: AbortSignal, envelope: SubmitEnvelope): Promise<PickOutcome> {
     const projection = this.project()
     for (const src of this.deps.roster.all()) {
       if (signal.aborted) {
         throw signal.reason instanceof Error ? signal.reason : new Error('slash adjudication aborted')
       }
       if (src.matchEnter === undefined || !line.startsWith(src.trigger)) continue
-      const outcome = await src.matchEnter(projection, line, signal)
+      const outcome = await src.matchEnter(projection, line, signal, envelope)
       if (outcome !== undefined) return outcome
     }
     return undefined

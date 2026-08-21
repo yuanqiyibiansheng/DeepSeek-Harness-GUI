@@ -796,7 +796,7 @@ describe('adjudicate', () => {
         return Promise.resolve('handled')
       }),
     ])
-    const result = await controller.adjudicate('/goal make it fast', new AbortController().signal)
+    const result = await controller.adjudicate('/goal make it fast', new AbortController().signal, { images: 0 })
     expect(result).toEqual({ claim })
     expect(calls).toEqual(['first:/goal make it fast', 'second:/goal make it fast'])
   })
@@ -807,7 +807,7 @@ describe('adjudicate', () => {
       enterSource('@', 'subagent', atHook),
       enterSource('/', 'command', () => Promise.resolve(undefined)),
     ])
-    await expect(controller.adjudicate('/xyz', new AbortController().signal)).resolves.toBeUndefined()
+    await expect(controller.adjudicate('/xyz', new AbortController().signal, { images: 0 })).resolves.toBeUndefined()
     expect(atHook).not.toHaveBeenCalled()
   })
 
@@ -816,7 +816,7 @@ describe('adjudicate', () => {
       enterSource('/', 'command', () => Promise.reject(new Error('warmup failed'))),
       enterSource('/', 'late', () => Promise.resolve('handled')),
     ])
-    await expect(controller.adjudicate('/goal x', new AbortController().signal))
+    await expect(controller.adjudicate('/goal x', new AbortController().signal, { images: 0 }))
       .rejects.toThrow('warmup failed')
   })
 
@@ -825,7 +825,7 @@ describe('adjudicate', () => {
     const { controller } = controllerBench([enterSource('/', 'command', hook)])
     const abort = new AbortController()
     abort.abort(new Error('attempt released'))
-    await expect(controller.adjudicate('/goal', abort.signal)).rejects.toThrow('attempt released')
+    await expect(controller.adjudicate('/goal', abort.signal, { images: 0 })).rejects.toThrow('attempt released')
     expect(hook).not.toHaveBeenCalled()
   })
 })

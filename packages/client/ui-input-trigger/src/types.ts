@@ -44,6 +44,16 @@ export interface TokenSpan {
   readonly draftRev: number
 }
 
+/** Base64-encoded composer image accompanying one claimed submit transaction. */
+export interface SubmitImageAttachment {
+  /** Declared media type; the host verifies it against the decoded bytes. */
+  readonly mediaType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif'
+  /** Canonical base64 encoding of the image bytes. */
+  readonly data: string
+  /** Optional display name; never interpreted as a path. */
+  readonly name?: string
+}
+
 /**
  * Command-mode entry credential. Pure data + a closure method — no class, no
  * cross-package runtime value (client bundle purity).
@@ -53,8 +63,18 @@ export interface CommandClaim {
   readonly token: string
   /** Ghost-text hint rendered while the claim's args are blank. */
   readonly hint?: string
-  /** Enter transaction, supplied by the source as a closure. */
-  submit(args: string, actx: ClientContext): Promise<SubmitOutcome>
+  /**
+   * Whether composer image attachments may accompany this command's submit.
+   * Absent = the composer refuses to submit while images are attached, keeping
+   * the draft and the images in place behind a visible notice.
+   */
+  readonly images?: boolean
+  /**
+   * Enter transaction, supplied by the source as a closure.
+   * @param images - serialized composer images accompanying the submission;
+   *   the composer passes them only when {@link CommandClaim.images} is true.
+   */
+  submit(args: string, actx: ClientContext, images: readonly SubmitImageAttachment[]): Promise<SubmitOutcome>
 }
 
 /**
@@ -93,6 +113,16 @@ export type PickOutcome =
   | { readonly text: string }
   | 'handled'
   | undefined
+
+/**
+ * Non-text composer submission state visible to enter adjudication. The
+ * composer owns the actual attachment payloads; adjudication only needs their
+ * presence to accept or refuse a whole submission.
+ */
+export interface SubmitEnvelope {
+  /** Number of image attachments accompanying the draft. */
+  readonly images: number
+}
 
 /** Candidate request passed to a source. The signal is superseded on query change / menu close. */
 export interface CandidateRequest {
@@ -151,9 +181,12 @@ export interface InputTriggerSource {
    * reject on warmup failure. `line` is the full trimmed draft: the source
    * parses it and applies its own kind policy — args-tolerant kinds claim
    * with trailing text present, bare-token-only kinds answer undefined
-   * unless the line is exactly the token.
+   * unless the line is exactly the token. `envelope` describes the rest of
+   * the composer submission; a source that would consume the line but cannot
+   * carry the envelope throws to surface the refusal and leave draft and
+   * attachments in place.
    */
-  matchEnter?(session: ClientSessionContext, line: string, signal: AbortSignal): Promise<PickOutcome>
+  matchEnter?(session: ClientSessionContext, line: string, signal: AbortSignal, envelope: SubmitEnvelope): Promise<PickOutcome>
   /**
    * Scope-birth prewarm hook (fire-and-forget): the per-session controller
    * calls it once when the session scope comes alive so sources can fetch

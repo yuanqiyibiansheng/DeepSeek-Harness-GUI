@@ -10,6 +10,7 @@
  */
 import type { ClientContext, ISessions, SessionBinding, SessionFace, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { InputTriggerController } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { SubmitImageAttachment } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
 import { queueReadFaceOf } from '../queue/store.ts'
 import type { ComposerKeyboard, DraftAttachmentId, SessionInputResolver, SessionInput } from './contract.ts'
@@ -30,6 +31,7 @@ interface ConversationAttachmentFace {
     imageIds: readonly DraftAttachmentId[],
     mode: InputSubmitMode,
   ): Promise<void>
+  serializeCommandImages(ids: readonly DraftAttachmentId[]): Promise<readonly SubmitImageAttachment[]>
   releaseDraftImage(id: DraftAttachmentId): void
 }
 
@@ -76,6 +78,13 @@ export class InputHub implements SessionInputResolver {
       popup: () => this.popup(actx),
       queue: queueReadFaceOf(session),
       defaultSink: (text, imageIds, mode) => { this.sink(session, text, imageIds, mode) },
+      commandImages: {
+        serialize: ids => this.conversation().serializeCommandImages(ids),
+        release: ids => {
+          const conversation = this.conversation()
+          for (const id of ids) conversation.releaseDraftImage(id)
+        },
+      },
       steerQueue: () => { void this.steerQueue(session, shell) },
     })
     this.shells.set(id, shell)
