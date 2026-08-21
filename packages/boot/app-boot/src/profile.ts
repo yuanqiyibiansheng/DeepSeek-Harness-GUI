@@ -112,8 +112,19 @@ export function resolveProfileDir(name: string, home: string = resolveDshHome())
 
 /** The shipped profile templates auto-initialized on first use, by name. */
 export const PROFILE_TEMPLATES: Record<string, readonly string[]> = {
-  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'],
+  web: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app', 'dsh-theme-firefly', '@magiczerowxy/dsh-modef'],
   headless: ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-headless'],
+}
+
+/**
+ * Shipped default dependencies seeded into a freshly-initialized profile's
+ * manifest (in addition to the in-box bundles above). In-box bundles are
+ * provided by the installation and are not dependencies; a shipped plugin that
+ * should also appear as an installed community plugin in the plugin market is
+ * declared here so the profile manifest lists it in `dependencies`.
+ */
+export const PROFILE_TEMPLATE_DEPENDENCIES: Record<string, Record<string, string>> = {
+  web: { 'dsh-theme-firefly': '^0.1.1', '@magiczerowxy/dsh-modef': '^0.1.0' },
 }
 
 /** Installation-owned bundle tuples normalized to the shipped template. */
@@ -148,15 +159,17 @@ autoInstallPeers: false
  * so re-running is a no-op on an initialized profile.
  * @param dir - the profile directory from {@link resolveProfileDir}.
  * @param bundles - the initial `dsh.profile.bundles` layer list.
+ * @param defaultDependencies - optional shipped dependencies seeded into the
+ * profile manifest (e.g. a default plugin the market should show installed).
  */
-export function initProfile(dir: string, bundles: readonly string[]): void {
+export function initProfile(dir: string, bundles: readonly string[], defaultDependencies?: Record<string, string>): void {
   mkdirSync(dir, { recursive: true })
   const manifestPath = join(dir, 'package.json')
   if (!existsSync(manifestPath)) {
     const manifest: ProfileManifest & { private: boolean } = {
       name: `dsh-profile-${basename(dir)}`,
       private: true,
-      dependencies: {},
+      dependencies: { ...defaultDependencies },
       dsh: { profile: { bundles: [...bundles] } },
     }
     writeFileSync(manifestPath, JSON.stringify(manifest, undefined, 2) + '\n')
@@ -438,7 +451,7 @@ export function loadProfile(
         `${binName}: profile ${JSON.stringify(name)} does not exist; create it with 'dsh plugin --profile ${name} add <package>'`,
       )
     }
-    initProfile(dir, template)
+    initProfile(dir, template, PROFILE_TEMPLATE_DEPENDENCIES[name])
   }
   const manifest = normalizeShippedProfile(name, dir, readProfileManifest(binName, dir))
   // A hand-written profile manifest may omit the dsh section entirely.

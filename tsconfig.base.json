@@ -150,6 +150,9 @@
       "@deepseek-ai/dsh-client-*/invariant": ["./packages/client/*/src/invariant.ts"],
       "@deepseek-ai/dsh-headless/startup": ["./packages/bundle/headless/src/startup.ts"],
       "@deepseek-ai/dsh-web-app/startup": ["./packages/bundle/web-app/src/startup.ts"],
+      "dshmarket": ["./packages/bundle/dsh-market/src"],
+      "dsh-theme-firefly": ["./packages/bundle/dsh-theme-firefly/lib/index.js"],
+      "@magiczerowxy/dsh-modef": ["./packages/bundle/dsh-modef/lib/index.js"],
       "@deepseek-ai/dsh-client-*/client": ["./packages/client/*/src/client"],
        // One wildcard maps every @deepseek-ai/dsh-<name> to its source. Package
       // dir names are unique across groups, so first-on-disk-wins resolution is

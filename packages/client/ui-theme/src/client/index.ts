@@ -118,8 +118,6 @@ function appearanceOptions(t: (key: ThemeKey) => string): AppearanceRowOption[] 
   return [
     { id: 'light', label: t('appearance.light'), kind: 'light' },
     { id: 'dark', label: t('appearance.dark'), kind: 'dark' },
-    { id: 'angelina-light', label: '安洁莉娜亮色', kind: 'light' },
-    { id: 'angelina-dark', label: '安洁莉娜暗色', kind: 'dark' },
     { id: 'system', label: t('appearance.system'), kind: 'system' },
   ]
 }
