@@ -35,10 +35,25 @@ export interface WireSystemMessage {
   content: string
 }
 
-/** User-role message: a single string of user input. */
+/** A single text part of a multimodal user message. */
+export interface WireTextPart {
+  type: 'text'
+  text: string
+}
+
+/** A single base64 data-URL image part of a multimodal user message. */
+export interface WireImagePart {
+  type: 'image_url'
+  image_url: { url: string }
+}
+
+/** One part of a multimodal user message; a text-only message stays a plain string. */
+export type WireUserContentPart = WireTextPart | WireImagePart
+
+/** User-role message: plain string, or a multimodal array carrying text plus images. */
 export interface WireUserMessage {
   role: 'user'
-  content: string
+  content: string | WireUserContentPart[]
 }
 
 /** Tool-role message: the result of one tool call, keyed by its call id. */

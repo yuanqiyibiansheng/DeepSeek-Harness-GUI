@@ -6,6 +6,7 @@
 // entries. Tool composition belongs to ui-tool and its machinery spec.
 
 import { describe, expect, it, vi } from 'vitest'
+import { FakeApiClient } from '../../runtime/tests/fake-api.client.ts'
 import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
@@ -21,7 +22,8 @@ const CHILD = 'child-1' as SessionId
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  const api = new FakeApiClient()
+  runtime.provide('connection', { api, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)

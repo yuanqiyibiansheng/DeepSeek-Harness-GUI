@@ -655,6 +655,13 @@ export class LlmRuntime extends Service {
     // Capability metadata rides through: an explicit modality omission is
     // negative capability downstream preflights act on (image admission).
     const inputModalities = this.detachedModalities(resolved.inputModalities)
+    const maxTokens = resolved.maxTokens
+    if (maxTokens !== undefined && (!Number.isSafeInteger(maxTokens) || maxTokens <= 0)) {
+      throw new LlmError(
+        `adapter returned invalid model maxTokens for provider "${provider}" model "${model}"`,
+        'INVALID_MODEL_MAX_TOKENS',
+      )
+    }
     const defaultMaxTokens = resolved.defaultMaxTokens
     if (defaultMaxTokens !== undefined
       && (!Number.isSafeInteger(defaultMaxTokens) || defaultMaxTokens <= 0)) {
@@ -670,6 +677,7 @@ export class LlmRuntime extends Service {
       ...resolved.description === undefined ? {} : { description: resolved.description },
       ...inputModalities === undefined ? {} : { inputModalities },
       ...context === undefined ? {} : { context: { contextWindow: context.contextWindow } },
+      ...maxTokens === undefined ? {} : { maxTokens },
       ...defaultMaxTokens === undefined ? {} : { defaultMaxTokens },
     }
     const reasoning = resolved.reasoning

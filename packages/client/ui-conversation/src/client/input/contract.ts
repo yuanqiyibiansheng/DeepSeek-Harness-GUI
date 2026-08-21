@@ -81,6 +81,8 @@ export interface InputActions {
   pruneImages(ids: readonly DraftAttachmentId[]): void
   /** Enter submission (adjudication / claim transaction / default sink inside). */
   submit(): void
+  /** Keep local draft state untouched while a rewind rebuilds the session. */
+  resetForRewind(): void
 }
 
 /** One surfaced notice (command results, adjudication failures). seq keys re-render of repeats. */

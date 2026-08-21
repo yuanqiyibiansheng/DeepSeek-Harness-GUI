@@ -133,6 +133,7 @@ export function resolveTargetPolicy(
 export function resolveCompactSpec(
   policy: ResolvedTargetPolicy,
   contextWindow: number,
+  maxTokens?: number,
 ): ResolvedCompactSpec {
   const targetKey = `${policy.target.provider}/${policy.target.model}`
   if (!Number.isInteger(contextWindow) || contextWindow <= 0) {
@@ -141,9 +142,23 @@ export function resolveCompactSpec(
       `BasicCompactionConfig: contextWindow (${contextWindow}) must be a positive integer`,
     )
   }
-  const thresholdTokens = Math.floor(contextWindow * policy.thresholdRatio)
+  // When output capability is unset or already at least the context window,
+  // fall back to the full window as prompt budget. pi-ai fills an absent
+  // maxTokens with 32_768, which outgrows a smaller hand-configured
+  // contextWindow; that is a capability default, not a request cap, and it
+  // must not disable compaction.
+  const promptBudget = maxTokens === undefined || maxTokens >= contextWindow
+    ? contextWindow
+    : contextWindow - maxTokens
+  if (!Number.isInteger(promptBudget) || promptBudget <= 0) {
+    throw new TargetPressureConfigError(
+      targetKey,
+      `BasicCompactionConfig: promptBudget (${promptBudget}) must be a positive integer`,
+    )
+  }
+  const thresholdTokens = Math.floor(promptBudget * policy.thresholdRatio)
   const retainTokens = policy.retainTokens === undefined
-    ? Math.floor(contextWindow * policy.retainRatio)
+    ? Math.floor(promptBudget * policy.retainRatio)
     : policy.retainTokens
   if (retainTokens >= thresholdTokens) {
     throw new TargetPressureConfigError(
@@ -155,6 +170,7 @@ export function resolveCompactSpec(
   return deepFreeze({
     target: { ...policy.target },
     contextWindow,
+    promptBudget,
     thresholdRatio: policy.thresholdRatio,
     thresholdTokens,
     retainTokens,

@@ -158,6 +158,17 @@ class TestPersistence extends SessionPersistence {
     return Promise.resolve([...this.durable.values()].map(value => value.meta))
   }
 
+  async trim(id: SessionId, cutoffSeq: number): Promise<{ removedCount: number }> {
+    const stored = this.durable.get(id)
+    if (stored === undefined) {
+      throw new Error(`test persistence: session '${id}' not found`)
+    }
+    const kept = stored.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = stored.events.length - kept.length
+    this.durable.set(id, { meta: stored.meta, events: kept })
+    return { removedCount }
+  }
+
   async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
     await this.onListSnapshots?.()
     return [...this.durable.values()].map((value, index) => ({

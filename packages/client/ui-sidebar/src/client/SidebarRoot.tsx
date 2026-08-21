@@ -116,6 +116,7 @@ export function SidebarRoot({
   return (
     <div
       ref={column}
+      data-ds-sidebar=""
       className={clsx(
         css.root, !wide && css.collapsed, !wide && everWide.current && css.railIn,
         collapsed && wide && css.fading, !pointerInside && css.quietBars,
@@ -127,7 +128,7 @@ export function SidebarRoot({
       }}
       onPointerLeave={() => { armLinger() }}
     >
-      <div className={css.logoRow}>
+      <div className={css.logoRow} data-ds-sidebar-logo-row="">
         {/* Expanded, the wordmark doubles as a New Session shortcut; the
             collapsed rail's logo is the expand toggle below instead. */}
         {wide && (

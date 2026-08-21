@@ -173,6 +173,78 @@ describe('scope tree', () => {
   })
 })
 
+describe('formal session resync', () => {
+  it('runs the resident session reconnect rebuild without dropping selection', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1', cwd: '/w/a' }])
+    b.svc.open(sid('s1'))
+    const live = b.svc.binding(sid('s1'))?.session as { resync: () => Promise<void> } | undefined
+    expect(live).toBeDefined()
+    const resync = vi.spyOn(live!, 'resync').mockResolvedValue(undefined)
+
+    await b.svc.resync(sid('s1'))
+
+    expect(resync).toHaveBeenCalledTimes(1)
+    expect(b.svc.list.getSnapshot().current).toBe('s1')
+  })
+})
+
+describe('in-place session reopen', () => {
+  const historyCount = (b: Bench): number =>
+    b.api.calls.filter(call => call.method === 'session.history').length
+
+  it('tears down the resident scope, mints a fresh scope/session, and reopens the window', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1', cwd: '/w/a' }, { id: 's2' }])
+    b.svc.open(sid('s1'))
+    const first = b.svc.binding(sid('s1'))
+    const firstSession = first?.session
+    expect(firstSession).toBeDefined()
+    const firstCtx = b.svc.scope(sid('s1'))
+    expect(firstCtx).toBeDefined()
+    const historyBefore = historyCount(b)
+
+    await b.svc.reopen(sid('s1'))
+
+    // Fresh scope identity, same id stays current.
+    const rebuilt = b.svc.binding(sid('s1'))
+    expect(rebuilt).toBeDefined()
+    expect(rebuilt?.session).not.toBe(firstSession)
+    expect(rebuilt?.ctx).not.toBe(firstCtx)
+    expect(b.svc.list.getSnapshot().current).toBe('s1')
+    // A reopened cold session pulls its window like a fresh open would.
+    expect(historyCount(b)).toBeGreaterThan(historyBefore)
+  })
+
+  it('declines a premature remint while the old teardown is settling', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1' }])
+    b.svc.open(sid('s1'))
+    const first = b.svc.binding(sid('s1'))
+
+    // Begin the reopen but do not await: the old fiber teardown is in flight.
+    const pending = b.svc.reopen(sid('s1'))
+    // A synchronous republish during that window must not mint a second scope
+    // onto the still-bound Session — publishCurrent resolves against the
+    // rebuilding guard and falls back to the static maybe-projection.
+    b.svc.open(sid('s1'))
+    await pending
+
+    const rebuilt = b.svc.binding(sid('s1'))
+    expect(rebuilt).toBeDefined()
+    expect(rebuilt?.session).not.toBe(first?.session)
+  })
+
+  it('reopens an untouched cold id through the same path', async () => {
+    const b = bench()
+    await feedList(b, [{ id: 's1' }])
+    // No scope minted yet: reopen must still select it (and not throw).
+    await expect(b.svc.reopen(sid('s1'))).resolves.toBeUndefined()
+    expect(b.svc.list.getSnapshot().current).toBe('s1')
+    expect(b.svc.binding(sid('s1'))).toBeDefined()
+  })
+})
+
 describe('current selection (migrated from ui-layout, arbitrated into the list snapshot)', () => {
   afterEach(() => { vi.unstubAllGlobals() })
 

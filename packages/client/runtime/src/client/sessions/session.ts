@@ -31,6 +31,20 @@ import { SessionQueueMirror } from './queue-mirror.ts'
 /** Messages requested per history page. */
 export const PAGE_MESSAGES = 50
 
+/**
+ * Projection keys that require at least one started turn or billed request.
+ *
+ * A host-authoritative blank session has not started any turn, so retained
+ * values for these keys can only be stale client state from an earlier
+ * incarnation or a superseded open.
+ */
+const BLANK_ONLY_STALE_PROJECTIONS = [
+  'contextPressure',
+  'contextBreakdown',
+  'tokenUsage',
+  'sessionStats',
+] as const
+
 /** Manager-owned observers of a Session object's local state edges. */
 export interface SessionOptions {
   /** Catalog-discovered address selecting non-activating subagent transport. */
@@ -565,9 +579,13 @@ export class Session implements SessionFace {
    * @param blank - the summary's derived empty-log bit.
    */
   handleBlank(blank: boolean): void {
-    if (blank === this.blankBit) return
+    if (blank === this.blankBit) {
+      if (blank) this.projections.clear(BLANK_ONLY_STALE_PROJECTIONS)
+      return
+    }
     if (blank && (this.promptAttempted || this.running)) return
     this.blankBit = blank
+    if (blank) this.projections.clear(BLANK_ONLY_STALE_PROJECTIONS)
     this.notifier.markDirty()
   }
 

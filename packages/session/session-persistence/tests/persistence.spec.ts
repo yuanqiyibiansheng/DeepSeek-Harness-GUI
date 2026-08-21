@@ -118,6 +118,10 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     return this.coordinator.readFrom(id, fromSeq, signal)
   }
 
+  override trim(id: SessionId, cutoffSeq: number, signal?: AbortSignal): Promise<{ removedCount: number }> {
+    return this.coordinator.trim(id, cutoffSeq, signal)
+  }
+
   // --- PersistenceBackend hooks (the Map storage primitives) ---
 
   // A Map-backed store has no torn tails, so `tornMarker` is never set.
@@ -159,6 +163,15 @@ class MemoryPersistence extends SessionPersistence implements PersistenceBackend
     /* v8 ignore next -- commitRepair only runs for a materialized (stored) session */
     if (!entry) return
     if (closers.length > 0) entry.events.push(...structuredClone(closers) as SessionEvent[])
+  }
+
+  async trimStored(id: SessionId, cutoffSeq: number): Promise<{ removedCount: number }> {
+    const entry = this.store.get(id)
+    if (entry === undefined) throw new Error(`session "${id}" not found`)
+    const kept = entry.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = entry.events.length - kept.length
+    this.store.set(id, { meta: entry.meta, events: structuredClone(kept) as SessionEvent[] })
+    return { removedCount }
   }
 
   async list(signal?: AbortSignal): Promise<SessionHeader[]> {
@@ -226,6 +239,15 @@ class ControlledBackend implements PersistenceBackend<never> {
     this.repairAttempts += 1
     const entry = this.store.get(m.id)
     if (entry !== undefined) entry.events.push(...structuredClone(closers) as SessionEvent[])
+  }
+
+  async trimStored(id: SessionId, cutoffSeq: number): Promise<{ removedCount: number }> {
+    const entry = this.store.get(id)
+    if (entry === undefined) throw new Error(`session "${id}" not found`)
+    const kept = entry.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = entry.events.length - kept.length
+    this.store.set(id, { meta: entry.meta, events: structuredClone(kept) as SessionEvent[] })
+    return { removedCount }
   }
 
   async list(): Promise<SessionHeader[]> {

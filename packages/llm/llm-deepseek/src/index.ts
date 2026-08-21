@@ -86,6 +86,7 @@ const catalogModel: z<DeepSeekCatalogModel> = z.object({
   description: z.string(),
   contextWindow: z.number().step(1).min(1),
   maxTokens: z.number().step(1).min(1),
+  inputModalities: z.array(z.union(['text', 'image'])),
 })
 
 export const Config: z<Config> = z.object({
@@ -134,6 +135,12 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
         `llm-deepseek: catalog model "${model.id}" maxTokens must be a positive integer`,
       )
     }
+    // Schemastery normalizes an omitted array to `[]`; an empty modality list
+    // means text-only, so treat it as undeclared (negative capability) rather
+    // than forwarding an empty declaration.
+    const inputModalities = model.inputModalities !== undefined && model.inputModalities.length > 0
+      ? model.inputModalities
+      : undefined
     if (seen.has(model.id)) throw new Error(`llm-deepseek: duplicate catalog model "${model.id}"`)
     seen.add(model.id)
     return {
@@ -142,6 +149,7 @@ function resolveModels(models: readonly DeepSeekCatalogModel[] | undefined): Dee
       ...model.description === undefined ? {} : { description: model.description },
       ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
       ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+      ...inputModalities === undefined ? {} : { inputModalities },
     }
   })
 }
@@ -247,7 +255,12 @@ export function apply(ctx: Context, config: Config): void {
 
   let userId: AnonymousUserId | undefined
   const resolveUserId = (): AnonymousUserId => userId ??= getOrCreateAnonymousUserId()
-  const adapter = new DeepSeekAdapter({ options, resolveApiKey, resolveUserId })
+  const adapter = new DeepSeekAdapter({
+    options,
+    resolveApiKey,
+    resolveUserId,
+    resolveAttachments: () => ctx.get('attachments'),
+  })
   ctx.llm.registerConfigurableProviders([
     { provider: PROVIDER, displayName: 'DeepSeek', settingsNs: NS, settingsPath: [] },
   ])

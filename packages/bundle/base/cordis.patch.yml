@@ -100,6 +100,16 @@
       config:
         root: !!js dshHomePath('sessions')
 
+    # Per-user-message file backups recorded from tool execution; the rewind
+    # service restores them together with the conversation.
+    - id: file-history
+      name: '@deepseek-ai/dsh-file-history'
+
+    # Session rewind: preview and execute conversation+file rollback to any
+    # user message (Typert Remotes sessionRewind/*).
+    - id: session-rewind
+      name: '@deepseek-ai/dsh-session-rewind'
+
     # Durable image bytes live outside the append-only session log. Messages
     # keep content-addressed references that this shared backend resolves for
     # provider requests and authorized history reads.

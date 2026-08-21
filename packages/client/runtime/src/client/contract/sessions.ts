@@ -40,6 +40,23 @@ export interface ISessions {
    */
   open(id: SessionId): void
   /**
+   * Rebuild one session's live view in place: tear down the resident scope
+   * and Session instance, then reselect the same id so the runtime mint a
+   * fresh scope/shell and backfills the trimmed history from the host log
+   * (used after a rewind trim). Awaiting the promise means the old scope
+   * fiber's async teardown has fully settled before the rebuild begins.
+   * @param id - listed session id to rebuild.
+   * @returns completion of the old scope teardown and the rebuild trigger.
+   */
+  reopen(id: SessionId): Promise<void>
+  /**
+   * Force one resident session to run its formal reconnect rebuild without
+   * dropping selection; used after host-side rewind trim so the queue mirror
+   * re-baselines through the authoritative subscribed frame.
+   * @param id - listed or addressed session id.
+   */
+  resync(id: SessionId): Promise<void>
+  /**
    * Open a healthy catalog child through its exact direct-parent address.
    * @param address - catalog-derived parent and child ids.
    */

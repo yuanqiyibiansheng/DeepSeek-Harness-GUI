@@ -160,6 +160,25 @@ export class ProjectionValueStore {
   }
 
   /**
+   * Drop a selected set of keys immediately.
+   *
+   * This is a client-side correction path for authoritative host facts that
+   * prove a retained projection can no longer describe this session (for
+   * example, an empty-log session cannot have durable token-meter values).
+   * @param keys - projection keys to remove when present.
+   * @returns whether at least one row was removed.
+   */
+  clear(keys: Iterable<string>): boolean {
+    let changed = false
+    for (const key of keys) {
+      if (!this.rows.delete(key)) continue
+      changed = true
+      this.changed(key)
+    }
+    return changed
+  }
+
+  /**
    * Drop rows past a mux-generation baseline (`session/subscribed.lastSeq`):
    * a row claiming knowledge beyond the host's own durable baseline rode
    * state a restart lost — under last-wins it would wrongly outrank the

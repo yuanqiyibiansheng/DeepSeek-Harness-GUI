@@ -83,6 +83,16 @@ export function isContextWindowExceededError(detail: string): boolean {
     || TOO_LARGE_FOR_CONTEXT.test(detail)
     || /\b(?:input|prompt|request)\s+(?:is\s+)?too\s+(?:long|large)\s+for\s+(?:this|the)\s+model\b/i.test(detail)
     || EXCEEDS_MODEL_CONTEXT.test(detail)
+    // DeepSeek's four-part overflow detail reads e.g. "Input token exceed the
+    // limit" with no model/context word. Test the full "input tokens exceed"
+    // wording first (unambiguous), then accept a string naming the token bound
+    // plus a capacity label (`/8k`, `k/512`) alongside `exceed`, which is the
+    // only surviving shape that says nothing else. A bare 400 already
+    // classified as quota (see httpErrorCode) still counts as context overflow
+    // so automatic compaction recovers it instead of surfacing an
+    // INVALID_REQUEST dead end.
+    || /input tokens? exceed\b/i.test(detail)
+    || (/\binput token\b/i.test(detail) && /\b\/\d+t\b|\bk\/\d+\b/i.test(detail) && /\bexceed\b/i.test(detail))
 }
 
 /**

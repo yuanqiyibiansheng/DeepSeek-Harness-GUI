@@ -16,7 +16,9 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type { ApiProxy } from './api/index.ts'
-import { createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES } from './api-proxy.ts'
+import {
+  createApiProxy, DEFAULT_COLD_BLANK_PROBE_MAX_BYTES, type SessionRuntime,
+} from './api-proxy.ts'
 import { installVisionEnhancement } from './vision-enhancement.ts'
 import {
   DEFAULT_SESSION_LOG_COMPRESSION_LEVEL,
@@ -29,12 +31,17 @@ export { toFetchHandler } from './fetch/handler.ts'
 export { AbstractApiClient, InProcessApiClient } from './fetch/client.ts'
 export type { IApiClient } from './fetch/client.ts'
 export { createApiProxy } from './api-proxy.ts'
-export type { ApiProxyDefaults } from './api-proxy.ts'
+export type { ApiProxyDefaults, SessionRuntime } from './api-proxy.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** The host-side ApiProxy implementation (the transport-agnostic gateway face). */
     apiProxy: ApiProxy
+    /**
+     * Host-owned session-runtime verbs (stop one live agent/session), mounted
+     * by the gateway plugin for plugins that must tear a session down.
+     */
+    sessionRuntime: SessionRuntime
   }
 }
 
@@ -95,6 +102,7 @@ export class ApiProxyService extends Service implements ApiProxy {
   readonly events: ApiProxy['events']
   readonly downloads: ApiProxy['downloads']
   readonly respond: ApiProxy['respond']
+  readonly sessionRuntime: SessionRuntime
 
   constructor(ctx: Context, config: Config) {
     super(ctx, 'apiProxy')
@@ -126,9 +134,11 @@ export class ApiProxyService extends Service implements ApiProxy {
     this.pluginMarket = api.pluginMarket
     this.events = api.events
     this.downloads = api.downloads
+    this.sessionRuntime = api.sessionRuntime
     // createApiProxy returns closures (no `this` capture), so the bind is
     // behavior-neutral.
     this.respond = api.respond.bind(api)
+    ctx.provide('sessionRuntime', this.sessionRuntime)
   }
 }
 

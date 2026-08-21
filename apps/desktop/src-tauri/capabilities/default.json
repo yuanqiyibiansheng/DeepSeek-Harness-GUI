@@ -10,6 +10,7 @@
     "core:default",
     "allow-pet-control",
     "allow-restart-service",
+    "allow-restart-backend-in-place",
     "allow-balance-query",
     "allow-notify-task-done",
     "allow-open-recharge"

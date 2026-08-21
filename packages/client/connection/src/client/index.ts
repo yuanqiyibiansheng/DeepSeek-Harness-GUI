@@ -50,6 +50,13 @@ export interface HostDescriptionSource {
   subscribe(listener: () => void): () => void
 }
 
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    /** Browser connection owner: shared API client, host facts, and stream-loop control. */
+    connection: ConnectionHandle
+  }
+}
+
 /** Required services (none — this is the wire root). */
 export const inject: string[] = []
 
@@ -76,6 +83,11 @@ export interface ConnectionHandle {
    * @returns stop handle for the loop.
    */
   start(sinks: ConnectionSinks, config?: ConnectionConfig): { stop(): void }
+  /**
+   * Restart the currently owned stream loop with the exact same sinks and
+   * config, causing a fresh mux-generation handshake and subscribed replay.
+   */
+  restart(): void
 }
 
 /**
@@ -102,6 +114,26 @@ export function apply(ctx: Context): void {
       }
     }
   }
+  let currentController: ConnectionController | undefined
+  let currentSinks: ConnectionSinks | undefined
+  let currentConfig: ConnectionConfig | undefined
+  const mountController = (sinks: ConnectionSinks, config: ConnectionConfig | undefined): void => {
+    currentSinks = sinks
+    currentConfig = config
+    currentController = new ConnectionController(api, {
+      ...sinks,
+      onConnected: (next) => {
+        publishDescription(next)
+        if (!Object.is(description, next)) return
+        sinks.onConnected?.(next)
+      },
+      onStateChange: (state) => {
+        if (state === 'reconnecting') publishDescription(undefined)
+        sinks.onStateChange?.(state)
+      },
+    }, config ?? {})
+    currentController.start()
+  }
   const handle: ConnectionHandle = {
     api,
     isLoopback: pageLocation === undefined || isLoopbackHostname(pageLocation.hostname),
@@ -116,29 +148,22 @@ export function apply(ctx: Context): void {
     start(sinks, config) {
       if (started) throw new Error('connection: the stream loop is already owned by another consumer')
       started = true
-      const controller = new ConnectionController(api, {
-        ...sinks,
-        onConnected: (next) => {
-          publishDescription(next)
-          // A description subscriber may synchronously stop the loop. In that
-          // case publishDescription(undefined) has already retracted this
-          // generation, so do not leak its stale connected notification to
-          // the consumer sink afterward.
-          if (!Object.is(description, next)) return
-          sinks.onConnected?.(next)
-        },
-        onStateChange: (state) => {
-          if (state === 'reconnecting') publishDescription(undefined)
-          sinks.onStateChange?.(state)
-        },
-      }, config ?? {})
-      controller.start()
+      mountController(sinks, config)
       return {
         stop: () => {
-          controller.stop()
+          currentController?.stop()
+          currentController = undefined
+          currentSinks = undefined
+          currentConfig = undefined
           publishDescription(undefined)
         },
       }
+    },
+    restart() {
+      if (!started || currentSinks === undefined) throw new Error('connection: no owned stream loop to restart')
+      currentController?.stop()
+      publishDescription(undefined)
+      mountController(currentSinks, currentConfig)
     },
   }
   ctx.provide('connection', handle)

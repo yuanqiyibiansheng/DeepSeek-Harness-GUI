@@ -8,16 +8,18 @@
  * @module dsh-llm-deepseek/adapter
  */
 
-import { attributionHeaders, CONTEXT_WINDOW_EXCEEDED_CODE, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { attributionHeaders, contentHasImage, CONTEXT_WINDOW_EXCEEDED_CODE, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions,
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
+  ModelModality,
   ResolvedRetryPolicy,
   StreamChunk,
 } from '@deepseek-ai/dsh-llm'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
+import type { AttachmentStore } from '@deepseek-ai/dsh-attachment'
 import { idleWatchdog, timeoutOf } from '@deepseek-ai/dsh-timeout'
 import type { AnonymousUserId } from '@deepseek-ai/dsh-anonymous-user-id'
 import { serializeRequest } from './serialize.ts'
@@ -38,6 +40,13 @@ export interface DeepSeekCatalogModel {
   contextWindow?: number
   /** Per-request output cap for this model; omission falls back to the profile's {@link DeepSeekConnectionOptions.maxTokens}. */
   maxTokens?: number
+  /**
+   * Request modalities this model accepts; omission is negative capability
+   * (text-only). A vision model such as `deepseek-v4-flash-vision-exp`
+   * declares `['text', 'image']` so the `read_image` gate and the serializer
+   * accept image content on user messages.
+   */
+  inputModalities?: ModelModality[]
 }
 
 /**
@@ -83,6 +92,12 @@ export interface DeepSeekAdapterOptions {
   resolveApiKey: (connection: DeepSeekConnectionOptions) => Promise<string>
   /** Resolve the harness-home anonymous id shared with telemetry and feedback. */
   resolveUserId: () => AnonymousUserId
+  /**
+   * Resolve the durable attachment store for image-bearing requests, or
+   * `undefined` when no store is mounted. A request that carries an image
+   * without one refuses rather than silently dropping the image.
+   */
+  resolveAttachments?: () => AttachmentStore | undefined
 }
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
@@ -110,7 +125,10 @@ function modelInfo(provider: string, model: DeepSeekCatalogModel): LlmModelInfo 
     id: model.id,
     name: model.name ?? model.id,
     ...model.description === undefined ? {} : { description: model.description },
-    inputModalities: ['text'],
+    // An undeclared model defaults to text + image: image capability is
+    // decided by the provider, not by the harness preflight guard, so a
+    // text-only model that receives an image fails at the API with its own 400.
+    inputModalities: model.inputModalities ?? ['text', 'image'],
   }
 }
 
@@ -182,12 +200,11 @@ export class DeepSeekAdapter extends LlmAdapter {
     const contextWindow = configured?.contextWindow
       ?? connection.defaultContextWindow
     return Promise.resolve({
-      // The chat-completions wire route is text-only regardless of catalog
-      // membership, so the uncatalogued fallback declares the same negative
-      // capability — "unknown" here would let the host accept and persist
-      // images the serializer must then reject.
+      // An uncatalogued fallback declares text + image by default: the harness
+      // does not preflight image capability, so a genuinely text-only model
+      // that receives an image fails at the API with its own 400 instead.
       ...configured === undefined
-        ? { provider, id: model, name: model, inputModalities: ['text' as const] }
+        ? { provider, id: model, name: model, inputModalities: ['text' as const, 'image' as const] }
         : modelInfo(provider, configured),
       context: { contextWindow },
       defaultMaxTokens: configured?.maxTokens ?? connection.maxTokens,
@@ -225,6 +242,11 @@ export class DeepSeekAdapter extends LlmAdapter {
       ? consumer.signal
       : AbortSignal.any([options.signal, consumer.signal])
     using watchdog = idleWatchdog(upstream, connection.streamIdleTimeoutMs, STREAM_IDLE_TIMEOUT_CODE)
+    const hasImage = options.messages.some(message => contentHasImage(message.content))
+    const attachments = hasImage ? this.config.resolveAttachments?.() : undefined
+    if (hasImage && attachments === undefined) {
+      throw new LlmError('DeepSeek image input requires the durable attachment service', 'UNSUPPORTED_CONTENT')
+    }
     const iterator = this.request(
       options,
       watchdog.signal,
@@ -232,6 +254,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       apiKey,
       userId,
       () => { watchdog.pulse() },
+      attachments,
     )[Symbol.asyncIterator]()
     let exhausted = false
     try {
@@ -275,8 +298,9 @@ export class DeepSeekAdapter extends LlmAdapter {
     apiKey: string,
     userId: AnonymousUserId,
     onComment: () => void,
+    attachments: AttachmentStore | undefined,
   ): AsyncIterable<StreamChunk> {
-    const body = serializeRequest(options, connection.defaults)
+    const body = await serializeRequest(options, connection.defaults, attachments)
     // Prepared outside the try so the TRANSPORT label below covers exactly the
     // transport boundary, never a serialization failure.
     const payload = JSON.stringify(body)

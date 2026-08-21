@@ -257,6 +257,14 @@ export class SessionRuntime implements ISessions {
   private readonly selection: SnapshotStore<SessionSelection>
 
   private readonly scopes = new Map<SessionId, ScopeRecord>()
+  /**
+   * Sessions between scope teardown and rebuild (reopen). Guards resolve:
+   * while the old scope fiber's async teardown is still settling, a manager
+   * or list notification must not mint a fresh scope — its shell would race
+   * the old fiber's InputHub disposer (keyed by the same session id) and its
+   * Session would bind before the old one dropped.
+   */
+  private readonly rebuilding = new Set<SessionId>()
   /** The provide channel (roster, materialization rules, current projection) — shared with the test runtime's double. */
   private readonly provideChannel: SessionProvideChannel
   /**
@@ -371,6 +379,68 @@ export class SessionRuntime implements ISessions {
    */
   open(id: SessionId): void {
     this.manager.select(id)
+  }
+
+  /**
+   * Rebuild one session's live view in place: tear down the resident scope,
+   * Session instance, and slot stores, then reselect the same id so the
+   * runtime mint a fresh scope/shell and backfills the trimmed history from
+   * the host log. Used by session rewind after the host trimmed the durable
+   * log. The old scope fiber's async teardown fully settles before the
+   * rebuild trigger, so the new shell cannot race the old one's disposers
+   * (InputHub keyed the shells map by session id — a lingering teardown
+   * would delete the freshly minted shell).
+   * @param id - listed session id to rebuild.
+   * @returns completion of the old scope teardown and the rebuild trigger.
+   */
+  async reopen(id: SessionId): Promise<void> {
+    const record = this.scopes.get(id)
+    if (record !== undefined) {
+      // Remove before dispose: the scope map is the mint guard, so a lingering
+      // entry would make the reselect below resolve the dying record and never
+      // mint a new scope (the prune/sweep paths already delete first).
+      this.scopes.delete(id)
+      this.deferredRemovals.delete(id)
+      // Guard the teardown window: manager/list notifications flush on
+      // microtasks while the fiber settles, and resolve() must not mint onto
+      // the still-bound Session before it is dropped.
+      this.rebuilding.add(id)
+      try {
+        await record.fiber.dispose()
+        record.session.unbindScope()
+        this.rootCtx.get('slots')?.pruneStoreScope(id)
+        this.manager.drop(id)
+      } finally {
+        this.rebuilding.delete(id)
+      }
+    } else {
+      this.manager.drop(id)
+    }
+    this.manager.select(id)
+    // Reselect on the same id does not reopen the window (followCurrent
+    // watches the current id), so refresh the subagent tripwire and force a
+    // fresh open here; the provider channel publishes the minted scope via
+    // the list subscription.
+    const rebuilt = this.resolve(id)
+    /* v8 ignore next 3 -- defensive: select() above validates the id against
+     * the list, which is the resolve() eligibility guard, so the reselect
+     * always mints; kept so a future eligibility drift cannot lose the open. */
+    if (rebuilt !== undefined) {
+      void rebuilt.session.open()
+      void this.manager.refreshSubagents(id)
+    }
+  }
+
+  /**
+   * Run one session's formal reconnect rebuild without changing selection or
+   * dropping the scope tree first. The session keeps its identity, but its
+   * queue mirror and pending live state re-baseline through the subscribed
+   * frame of the next generation.
+   * @param id - listed or addressed session id.
+   */
+  async resync(id: SessionId): Promise<void> {
+    const session = this.manager.get(id)
+    await session.resync()
   }
 
   /**
@@ -631,6 +701,12 @@ export class SessionRuntime implements ISessions {
   private resolve(id: SessionId): ScopeRecord | undefined {
     const existing = this.scopes.get(id)
     if (existing !== undefined) return existing
+    // Reopen teardown window: the old fiber's disposers are still settling and
+    // the old Session still owns its scope binding, so a notification-flush
+    // must not mint here — it would bind a fresh scope onto the bound Session
+    // and race the old shell's InputHub teardown. resolve() simply declines;
+    // reopen() mints once the rebuild deletes the guard.
+    if (this.rebuilding.has(id)) return undefined
     if (!this.eligible(id)) return undefined
     const { fiber, ctx } = createScope(this.rootCtx, id)
     const session = this.manager.get(id)

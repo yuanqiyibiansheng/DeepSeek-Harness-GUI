@@ -33,9 +33,14 @@ harness LLM（大语言模型）seam 的 DeepSeek chat-completions 适配器：�
       - id: private-reasoner
         description: Company-hosted reasoning model
         contextWindow: 512000
+      - id: deepseek-v4-flash-vision-exp
+        name: DeepSeek-V4-Flash-Vision
+        inputModalities: [text, image]   # 可选；显式声明优先于默认值
 ```
 
 该插件注册唯一提供方路由 `deepseek-official`，同时注册解析后的 `retryPolicy`。请求使用 `provider: deepseek-official` 选择该路由；其 `model` 会作为协议 `model` 字符串原样传递，因此更改 DeepSeek 模型不需要生命周期时注册。省略 `models` 会公布 `deepseek-v4-flash`（名称为 `DeepSeek-V4-Flash`）和 `deepseek-v4-pro`（名称为 `DeepSeek-V4-Pro`），两者的上下文窗口均为 1,000,000 token；显式列表会替换这些默认值，`models: []` 则不公布任何模型。Catalog 配置项通过 `ctx.llm.listModels('deepseek-official')` 公开给 ACP（Agent Client Protocol）编辑器和 Web 选择器等客户端，但仍只提供建议：未列出模型 id 仍原样传递。省略配置项 name 默认为其 id。
+
+Catalog 配置项可以声明 `inputModalities` 以公布（或收窄）该模型接受的模态；声明优先。未声明时，该配置项与任何未列出的原样传递 id 默认都是 `[text, image]`，因此图片能力由提供方决定，而不是由 harness 预检决定——真正仅文本的模型收到图片会在 API 处以它自己的 400 报错。`ctx.llm.resolveModelInfo` 与 `listModels` 会报告解析后的模态，这正是让 `read_image` 工具门禁与上传预检对 `deepseek-v4-flash-vision-exp` 等视觉模型通过的原因。图片只在 user 消息中序列化；请求还必须挂载持久化附件服务（`ctx.attachments`），适配器才能把图片字节读成 base64 data URL。希望采用保守行为的部署可在配置项上显式声明 `inputModalities: [text]`。
 
 `contextWindow` 对每个已配置模型都可选，不会通过建议 catalog 公开。`ctx.llm.resolveModelInfo('deepseek-official', model).context` 先返回精确模型值，再对不含容量的配置项或未列出原样传递 id 返回 `defaultContextWindow`。适配器默认值为 1,000,000；因此，压力敏感插件可以获得由部署决定的容量，不会将模型 selector 视为权威。为 `deepseek-official` 注册另一个适配器会抛出 `LlmError('DUPLICATE_ADAPTER')`。
 
@@ -111,4 +116,4 @@ loop 保留的响应块会追加到下一个请求，并保留其较早可复用
 - **settings 的 `models` 列表会整体替换组合列表**：settings 层按字段合并，而数组是单个字段；按条目合并 catalog 需要带键的形状。
 - **未映射 `tool_choice`**：它不属于核心词汇（MVP 取舍，与 pi-ai twin 共享）。
 - **请求使用原始 `fetch`，而非 `@cordisjs/plugin-http`**：没有共享 proxy／拦截配置；采用暂缓到第二个适配器需要该功能时（`TODO(http)`）。
-- **序列化会将 user 与工具结果内容展平为文本块**：会跳过插件添加的块类型，空工具输出会以字面 `(no output)` 通过协议发送。
+- **序列化会将 user 文本与工具结果内容展平为文本**：会跳过插件添加的块类型，空工具输出会以字面 `(no output)` 通过协议发送。user 消息中的图片块是例外：它们会序列化为 `image_url` data URL，且需要持久化附件服务。工具结果中的图片会被拒绝，system／assistant 消息中的图片同样会被拒绝。

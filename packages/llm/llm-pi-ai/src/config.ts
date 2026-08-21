@@ -42,15 +42,14 @@ export const DEFAULT_MAX_TOKENS = 32_768
 
 /**
  * Modalities assumed for a model neither configuration nor the catalog
- * declares. Text is the floor every supported protocol certainly carries, so
- * this is the absence of a declaration rather than a guess at the endpoint:
- * nothing can interrogate a gateway for its modalities, and the two wrong
- * answers do not cost the same. Under-claiming refuses the image before it is
- * attached, naming the model. Over-claiming admits one the provider then
- * rejects mid-turn, after the message is durable, leaving the session
- * repeating a request that cannot succeed.
+ * declares. This defaults to text + image: image capability is decided by the
+ * provider, not by the harness preflight guard, so a text-only model that
+ * receives an image fails at the API with its own 400. A deployment that wants
+ * the conservative behavior (refuse images before they are attached) can
+ * declare `defaultInput: [text]` or set a model's `input` explicitly — the
+ * explicit declaration always wins over this default.
  */
-export const DEFAULT_INPUT: readonly PiAiModality[] = ['text']
+export const DEFAULT_INPUT: readonly PiAiModality[] = ['text', 'image']
 
 export type {
   PiAiCompatProfile,

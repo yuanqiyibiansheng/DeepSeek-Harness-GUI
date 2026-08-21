@@ -696,9 +696,6 @@ export function SideCardSection({ store, service }: SideCardSectionProps) {
         </div>
       </div>
 
-      {/* 侧边栏内容: one small card per registered tab type in a responsive
-          grid; features declaring `settings.toggles` open their settings in
-          the popup (gear corner button) instead of nested inline rows. */}
       <div className={css.group}>
         <div className={css.groupHeading}>
           <span>{t('settingsTabsTitle')}</span>

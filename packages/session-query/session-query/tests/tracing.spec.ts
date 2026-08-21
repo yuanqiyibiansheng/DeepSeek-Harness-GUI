@@ -91,6 +91,15 @@ class TracePersistence extends SessionPersistence {
     return Promise.resolve(result)
   }
 
+  async trim(id: SessionIdType, cutoffSeq: number): Promise<{ removedCount: number }> {
+    const entry = TracePersistence.entries.get(id)
+    if (entry === undefined) return Promise.reject(new Error('missing test session'))
+    const kept = entry.events.filter(event => event.seq < cutoffSeq)
+    const removedCount = entry.events.length - kept.length
+    TracePersistence.entries.set(id, { meta: entry.meta, events: kept })
+    return { removedCount }
+  }
+
   listSnapshots(): Promise<never[]> {
     return Promise.resolve([])
   }

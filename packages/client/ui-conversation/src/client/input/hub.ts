@@ -119,6 +119,18 @@ export class InputHub implements SessionInputResolver {
   }
 
   /**
+   * Read one resident shell without creating a new one. Rewind uses this to
+   * clear browser-owned draft state while the old session scope may already be
+   * collapsing; minting a fresh shell there would try to attach effects to an
+   * inactive scope.
+   * @param id - session id.
+   * @returns the resident shell, or undefined when none is alive.
+   */
+  existingShell(id: SessionId): SessionInputShell | undefined {
+    return this.shells.get(id)
+  }
+
+  /**
    * The InputBar-exclusive keyboard command face: the shell
    * satisfies it structurally; package-internal — handed through the
    * composer-bar entry's inject, never across a plugin boundary.

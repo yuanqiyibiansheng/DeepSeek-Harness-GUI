@@ -228,7 +228,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],
   })) as never
   const inputActions = {
-    setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(), submit: vi.fn(),
+    setDraft: vi.fn(), addImages: vi.fn(), removeImage: vi.fn(), pruneImages: vi.fn(), submit: vi.fn(), resetForRewind: vi.fn(),
   }
   // Minimal outlet twin: resolve the ring entry by the `only` filter and
   // render it with the session standard kit (what SlotOutlet does for a

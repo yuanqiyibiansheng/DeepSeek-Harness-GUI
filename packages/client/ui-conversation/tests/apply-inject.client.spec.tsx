@@ -16,6 +16,7 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { SlotTestRuntime, usePinnedBrowserLanguages, stubSettingsScope } from '@deepseek-ai/dsh-client-test-runtime'
+import { FakeApiClient } from '../../runtime/tests/fake-api.client.ts'
 import type { SessionBehaviorOverrides } from '@deepseek-ai/dsh-client-test-runtime'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ISession, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
@@ -47,7 +48,13 @@ function sessionFakeFor() {
 
 async function bench() {
   const runtime = await SlotTestRuntime.create()
-  runtime.provide('connection', { api: { settings: {} }, isLoopback: false })
+  const api = new FakeApiClient()
+  api.settings.describe = vi.fn(async () => ({ rpcId: 'settings-describe' as never, result: { ok: true as const, value: { writable: false, hasDocument: false, namespaces: [] } } }))
+  api.settings.openDocument = vi.fn(async () => ({ rpcId: 'settings-open' as never, result: { ok: true as const, value: { opened: true as const } } }))
+  api.settings.update = vi.fn(async () => ({ rpcId: 'settings-update' as never, result: { ok: true as const, value: { ns: 'test', schema: {}, value: {}, applies: 'live' as const, secrets: [], revision: 0 } } }))
+  api.settings.replace = vi.fn(async () => ({ rpcId: 'settings-replace' as never, result: { ok: true as const, value: { ns: 'test', schema: {}, value: {}, applies: 'live' as const, secrets: [], revision: 0 } } }))
+  api.settings.mutate = vi.fn(async () => ({ rpcId: 'settings-mutate' as never, result: { ok: true as const, value: { ns: 'test', schema: {}, value: {}, applies: 'live' as const, secrets: [], revision: 0 } } }))
+  runtime.provide('connection', { api, isLoopback: false })
   // The plugin injects both; these specs exercise no settings path.
   runtime.provide('remote', { $on: () => () => {} })
   runtime.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)

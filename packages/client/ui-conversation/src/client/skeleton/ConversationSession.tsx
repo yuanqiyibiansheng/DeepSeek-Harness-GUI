@@ -9,13 +9,6 @@ import type {
 import type { ViewTab } from '../contract/views.ts'
 import css from './ConversationRoot.module.css'
 
-declare global {
-  interface Window {
-    /** Desktop rollback draft hook: set the composer text without a reload. */
-    __dshSetRollbackDraft?: ((sessionId: string, text: string) => void) | undefined
-  }
-}
-
 /** Full props composed from the strict session body contract. */
 export type ConversationSessionProps = ConversationSessionSlotProps
 
@@ -164,25 +157,6 @@ export function ConversationSession({
     // Mount-only (deps pinned to inputActions): later store writes come from
     // the machine mirror, not this seed effect.
   }, [inputActions])
-
-  // A rollback stores the original user message in sessionStorage before
-  // reloading; restore it into the composer after the page reloads so the
-  // user can edit and resend it (dsh-TUI rewind semantics).
-  useEffect(() => {
-    const key = `dsh-rollback-draft:${sessionId}`
-    const pending = sessionStorage.getItem(key)
-    if (pending !== null && pending !== '') {
-      sessionStorage.removeItem(key)
-      inputActions.setDraft(pending)
-    }
-    const previous = window.__dshSetRollbackDraft
-    window.__dshSetRollbackDraft = (sid, text) => {
-      if (sid === String(sessionId)) inputActions.setDraft(text)
-    }
-    return () => {
-      window.__dshSetRollbackDraft = previous
-    }
-  }, [inputActions, sessionId])
 
   useEffect(() => () => {
     releaseSessionImages(sessionId)

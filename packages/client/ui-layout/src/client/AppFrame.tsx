@@ -167,6 +167,7 @@ export function AppFrame({
       className={css.frame}
       style={{ gridTemplateColumns: `${cols.sidebar}px minmax(0, 1fr) ${cols.details}px` }}
       data-app-frame
+      data-ds-app-frame
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-details-collapsed={cols.details === 0 || undefined}
       data-dragging={dragging || undefined}

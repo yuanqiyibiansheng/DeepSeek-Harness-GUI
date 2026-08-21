@@ -277,6 +277,44 @@ describe('live event path', () => {
     expect(snapshot.composerPhase).toBe('blank')
   })
 
+  it('clears stale context-meter projections when the host still proves the session blank', async () => {
+    const { session } = await opened([])
+    session.projections.apply('contextPressure', {
+      pressureTokens: 120_000,
+      projectedTokens: 128_000,
+      contextWindow: 128_000,
+    }, 9)
+    session.projections.apply('contextBreakdown', {
+      systemTokens: 2_000,
+      toolsTokens: 3_000,
+      messageTokens: 123_000,
+    }, 9)
+    session.projections.apply('tokenUsage', {
+      uncachedInputTokens: 90_000,
+      outputTokens: 12_000,
+      cacheReadTokens: 8_000,
+      cacheWriteTokens: 0,
+    }, 9)
+    session.projections.apply('sessionStats', {
+      turns: 4,
+      steps: 7,
+      llmMs: 1_000,
+      toolMs: 0,
+      ttftMs: 0,
+      ttftSteps: 0,
+      decodeMs: 0,
+      decodeTokens: 0,
+    }, 9)
+
+    session.handleBlank(true)
+
+    expect(session.projections.get('contextPressure')).toBeUndefined()
+    expect(session.projections.get('contextBreakdown')).toBeUndefined()
+    expect(session.projections.get('tokenUsage')).toBeUndefined()
+    expect(session.projections.get('sessionStats')).toBeUndefined()
+    expect(session.getSnapshot().composerPhase).toBe('blank')
+  })
+
   it('activates a fresh conversation for a command-input View Node without opening a model turn', async () => {
     const { session } = await opened([])
     session.handleBlank(true)

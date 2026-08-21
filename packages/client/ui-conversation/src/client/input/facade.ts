@@ -78,6 +78,7 @@ export class SessionInputShell implements SessionInput {
     removeImage: (id) => { this.removeImage(id) },
     pruneImages: (ids) => { this.pruneImages(ids) },
     submit: () => { this.submit('queue') },
+    resetForRewind: () => { this.resetForRewind() },
   }
 
   // Real wall clock: the typing-run merge window must actually expire in
@@ -156,6 +157,13 @@ export class SessionInputShell implements SessionInput {
     const submitted = new Set(imageIds)
     this.imageIds = this.imageIds.filter(id => !submitted.has(id))
     this.run(this.core.dispatch({ type: 'send-committed' }))
+  }
+
+  /** Clear local draft state before reopening a rewound session. */
+  resetForRewind(): void {
+    this.imageIds = []
+    this.run(this.core.dispatch({ type: 'draft-changed', draft: '' }))
+    this.notices.set(null)
   }
 
   /** Undo the latest transaction (InputBar intercepts the platform chord). */
