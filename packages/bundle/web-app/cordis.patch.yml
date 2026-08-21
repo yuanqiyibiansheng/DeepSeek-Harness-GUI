@@ -170,12 +170,6 @@
     - id: ui-theme
       name: '@deepseek-ai/dsh-client-ui-theme'
 
-    - id: ui-angelina
-      name: '@deepseek-ai/dsh-client-ui-angelina'
-
-    - id: ui-skin-maid-atelier
-      name: '@dsh-external/dsh-client-ui-skin-maid-atelier'
-
     - id: locale
       name: '@deepseek-ai/dsh-client-locale'
 
@@ -244,21 +238,21 @@
     - id: terminal-host
       name: '@deepseek-ai/dsh-terminal-host'
 
+    # Desktop pet: the global floating companion (agent working/thinking/idle states).
+    - id: ui-pet
+      name: '@deepseek-ai/dsh-client-ui-pet'
+
     # Project memory: keeps the Memorix MCP row in the harness user patch layer.
     - id: project-memory
       name: '@deepseek-ai/dsh-project-memory'
-
-    # Desktop pet: the global floating companion (working/thinking/idle states).
-    - id: ui-pet
-      name: '@deepseek-ai/dsh-client-ui-pet'
 
     # Project memory: the Memorix integration switch (Settings -> General).
     - id: ui-project-memory
       name: '@deepseek-ai/dsh-client-ui-project-memory'
 
-    # Plugin marketplace: the Settings → Plugins "Marketplace" tab (npm search/install).
-    - id: ui-plugin-marketplace
-      name: '@deepseek-ai/dsh-client-ui-plugin-marketplace'
+    # Standalone plugin market: Settings → 插件市场 (browse/search/install/recover community plugins).
+    - id: dsh-market
+      name: 'dshmarket'
 
     # Vision enhancement: settings row + composer shortcut for the Bailian image bridge.
     - id: ui-vision-enhancement

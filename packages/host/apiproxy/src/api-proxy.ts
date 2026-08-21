@@ -136,7 +136,7 @@ const DEFAULT_MAX_MESSAGES = 50
  * composition-layer patch.
  */
 const WEB_SETTINGS_NAMESPACES = [
-  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'ui-pet', 'project-memory', 'vision-enhancement', 'web-search-deepseek', 'describe-image', 'terminal',
+  'agent-loop', 'shell', 'locale', 'permission', 'ui-conversation', 'ui-theme', 'ui-pet', 'agent-presets', 'project-memory', 'vision-enhancement', 'web-search-deepseek', 'describe-image', 'terminal', 'dsh-modef',
 ] as const
 
 /** Provider work budget: at most 100 calls and 2,000 inspected hits. */

@@ -96,7 +96,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         // Main shell plus the standalone pet-window page (transparent desktop
-        // window; both served by the same backend origin).
+        // window, loads the same-origin pet.html).
         main: src('./index.html'),
         pet: src('./pet.html'),
       },

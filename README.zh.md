@@ -6,6 +6,121 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 它采用**一切皆插件**的架构，并由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper)。
 
+> **本地修改记录（2026-08-21）：移除自定义主题，恢复官方默认主题。**
+> - 修改目标：移除为 Web 客户端添加的自定义视觉主题（“深海女仆工坊”皮肤与“安洁莉娜”主题），恢复 DeepSeek Harness 官方默认主题。
+> - 修改文件：
+>   - `packages/bundle/web-app/cordis.patch.yml`（移除 `ui-angelina`、`ui-skin-maid-atelier` 两行）
+>   - `packages/bundle/web-app/package.json`（移除两个主题依赖）
+>   - `tsconfig.client.json`（移除两个工程引用）
+>   - `packages/client/ui-theme/src/client/index.ts`（外观设置移除“安洁莉娜亮色/暗色”两个选项）
+>   - 删除 `packages/client/ui-angelina`、`packages/client/ui-skin-maid-atelier` 两个包目录
+> - 修改内容：从 Web 客户端主题注册与外观设置中移除 Angelina 主题和 maid-atelier 皮肤，使默认的 light/dark 官方主题生效。
+> - 影响范围：仅影响 Web 客户端（`dsh web`）的外观设置与主题渲染；默认主题行为回到官方状态。
+> - 注意事项：需重新执行 `pnpm install` 清理 node_modules 中指向已删除包的残留符号链接，并重新构建前端产物后生效。
+
+> **本地修改记录（2026-08-21）：移植独立插件市场。**
+> - 修改目标：把 `dsh-market` 项目（`dshmarket`）移植到本仓库，作为独立的“设置 → 插件市场”，并替换旧的“设置 → 插件”里的 Marketplace（npm 搜索/安装）页签。
+> - 修改文件：
+>   - 新增 `packages/bundle/dsh-market/*`（`dshmarket` 包：host 侧 + client 侧 + `cordis.patch.yml`，已适配工作区构建：`package.json`、`tsconfig.json`、`tsdown.config.ts`、`src/invariant.ts`；未保留外部测试套件）
+>   - `packages/bundle/web-app/cordis.patch.yml`（把 `ui-plugin-marketplace` 行替换为 `dsh-market`/`dshmarket`）
+>   - `packages/bundle/web-app/package.json`（把 `@deepseek-ai/dsh-client-ui-plugin-marketplace` 依赖替换为 `dshmarket`）
+>   - `tsconfig.client.json`（把 `ui-plugin-marketplace` 工程引用替换为 `packages/bundle/dsh-market`）
+>   - 删除 `packages/client/ui-plugin-marketplace/*`
+> - 修改内容：Web 客户端现在在“设置 → 插件市场”显示独立的 dshmarket（浏览/搜索/一键安装主题与插件、备份恢复、更新、诊断、热禁用/启用）；旧的简单 Marketplace 页签已移除。
+> - 影响范围：仅 Web 客户端。版本说明——`dshmarket` 面向 `dsh web` rc.6/rc.7，而本仓库约 rc.5，故部分 rc.7 专属的市场自管理/配置卡片功能可能自动隐藏而非渲染。
+> - 注意事项：需执行 `pnpm install` 与 `pnpm run build`（或 `pnpm --filter dshmarket run bundle` 再加 web 前端重建），市场 bundle 与组合才会生效。
+
+> **本地修改记录（2026-08-21）：内置默认“流萤”主题插件。**
+> - 修改目标：把 `dsh-theme-firefly` 作为默认内置主题插件随项目打包，使“新建的 web profile”默认启用它，并在插件市场显示为“已安装”。
+> - 修改文件：
+>   - 新增 `packages/bundle/dsh-theme-firefly/*`（预构建的 `dsh-theme-firefly` bundle：客户端主题 + `cordis.patch.yml`；无源码，`lib/` 原样发布；`tsdown.config.ts` 返回空 `entry` 让工作区构建跳过它）
+>   - `packages/boot/app-boot/src/profile.ts`（`PROFILE_TEMPLATES.web` 现在捆绑 `dsh-theme-firefly`；新增 `PROFILE_TEMPLATE_DEPENDENCIES` 把它写入 profile 清单的 `dependencies`；`initProfile` 增加可选 `defaultDependencies` 参数）
+>   - `packages/boot/app-boot/src/index.ts`（导出 `PROFILE_TEMPLATE_DEPENDENCIES`）
+>   - `apps/cli/src/plugin.ts`（把 `PROFILE_TEMPLATE_DEPENDENCIES[profile]` 传给 `initProfile`）
+>   - `packages/bundle/web-app/package.json`（新增 `dsh-theme-firefly` 依赖）
+>   - `tsconfig.base.json`（新增 `dsh-theme-firefly` 源码路径映射）
+> - 修改内容：新建的 `web` profile 会启用流萤主题，并在 `dependencies` 中列出它，因此插件市场会显示“已安装”。
+> - 影响范围：默认 web profile 模板与 profile 初始化路径；已有 profile 不受影响。
+> - 注意事项：firefly 以预构建 `lib/` 发布（无 `src/`）；其 `tsdown.config.ts` 返回空 `entry` 让工作区构建跳过（否则 `pnpm run build` 会因缺少 tsc 生成的 `lib/types/*` 入口而失败）。需执行 `pnpm install` 并重建（`pnpm run build`）后生效。
+
+> **本地修改记录（2026-08-21）：为内置“流萤”主题的音乐播放器增加音量滑块。**
+> - 修改目标：在流萤主题的背景音乐控件中增加音量滑块，并绑定到音频音量（此前固定 0.9）。
+> - 修改文件：
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js`（重建 bundle：音乐卡片新增音量行（滑块 + 实时百分比），绑定 `audio.volume`，持久化到 `localStorage` 的 `ff_music_volume`，默认 0.9）
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js`（模板源码更新：滑块 CSS、卡片音量行、音量接线并重新嵌入）
+> - 修改内容：启用流萤主题后，音乐卡片会显示音量滑块与实时百分比，所选音量在刷新后保留。
+> - 影响范围：仅主题客户端 bundle。
+> - 注意事项：bundle 是在主题源码仓用 `node build.cjs` 重建（`assets/`、`music/`、`GIF/` 源文件在那里），fork 随包发布预构建的 `lib/`。
+
+> **本地修改记录（2026-08-21）：为“流萤”主题增加第 4 张静态壁纸 `dspk.png`。**
+> - 修改目标：把 `apps/desktop/src-tauri/icons/img/dspk.png` 加入流萤主题的壁纸资源（此前 3 张静态图）。
+> - 修改文件：
+>   - `packages/bundle/dsh-theme-firefly/assets/dspk.png`（复制进主题资源集）
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js`（重建 bundle，dspk.png 作为第 4 张静态壁纸嵌入；保留音量滑块改动）
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js`（模板源码重新嵌入）
+> - 修改内容：流萤主题现在有 4 张静态壁纸（firefly-bg.jpg、firefly2.png、firefly3.png、dspk.png）+ 默认视频。
+> - 影响范围：仅主题客户端 bundle 与资源。
+> - 注意事项：重建在主题源码仓执行（`node build.cjs`），bundle 因内嵌约 14 MB 图片，由约 70 MB 增至约 88 MB。
+
+> **本地修改记录（2026-08-21）：内置 `dsh-modef` 插件（模型选择 + 推理强度滑块）。**
+> - 修改目标：把 `@magiczerowxy/dsh-modef`（模型下拉 + Claude 风格推理强度滑块 + 最高档动画）作为默认 web profile 插件内置，使其默认启用、在插件市场显示“已安装”，并开放其通用设置开关。
+> - 修改文件：
+>   - 新增 `packages/bundle/dsh-modef/*`（预构建的 `@magiczerowxy/dsh-modef` bundle：host `lib/index.js` + client `lib/client.js` + `cordis.patch.yml`；清理了 host 半区写死路径的调试日志；`tsdown.config.ts` 返回空 `entry` 让工作区构建跳过）
+>   - `packages/boot/app-boot/src/profile.ts`（`PROFILE_TEMPLATES.web` 现在捆绑 `@magiczerowxy/dsh-modef`；`PROFILE_TEMPLATE_DEPENDENCIES.web` 用 `^0.1.0` 种子化）
+>   - `packages/host/apiproxy/src/api-proxy.ts`（把 `dsh-modef` 加入 `WEB_SETTINGS_NAMESPACES` 白名单，使通用设置开关可编辑——即插件 README 提到的官方决策点）
+>   - `packages/bundle/web-app/package.json`（新增 `@magiczerowxy/dsh-modef` 依赖）
+>   - `tsconfig.base.json`（新增 `@magiczerowxy/dsh-modef` 源码路径映射）
+> - 修改内容：新建的 `web` profile 会启用模型/推理强度选择器，并在 `dependencies` 列出 `@magiczerowxy/dsh-modef`，插件市场显示“已安装”；“高级的推理强度选择”开关**默认开启**（`advancedEffort` 默认 `true`），无需手动打开即可看到滑块。该设置默认值在预构建的 host 半区（`packages/bundle/dsh-modef/lib/index.js`），随预构建包原样发布（tsdown 跳过它）。
+> - 影响范围：默认 web profile 模板 + profile 初始化路径 + apiproxy 设置白名单；已有 profile 不受影响（仍需安装该插件或重新生成 profile）。
+> - 注意事项：dsh-modef 以预构建 `lib/` 发布（无 `src/`），其 `tsdown.config.ts` 跳过工作区构建；apiproxy 白名单改动在源码（`src/api-proxy.ts`），由 `pnpm run build` 重新编译。
+
+> **本地修改记录（2026-08-21）：把“流萤”主题的原生气泡改成内置 UI 风格气泡。**
+> - 修改目标：流萤主题的控制控件（音乐播放器、壁纸、萤火氛围、打字音效等）用的是系统原生的 `title` 气泡，改为与 dsh 内置 Tooltip 一致的外观（深色底板、浅字、圆角、淡入），让整款应用风格统一。
+> - 修改文件：
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js`（移除所有原生 `title=`/`.title`；控件改用 `data-tt`（样式气泡）+ `aria-label`（无障碍）；新增对齐 dsh `Tooltip` 视觉规范的 `[data-tt]::after` 气泡 CSS）
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js`（重建 bundle：88.1 MB，含上述改动）
+> - 修改内容：悬停/聚焦流萤主题的任意控件，现在显示内置风格气泡而非系统气泡。
+> - 影响范围：仅 firefly 主题客户端 bundle（dsh-market/dsh-modef 本就使用内置 React `Tooltip`）。
+> - 注意事项：在主题源码仓用 `node build.cjs` 重建；体积仍约 88 MB（未改资源）。
+
+> **本地修改记录（2026-08-21）：修复“流萤”气泡位置错乱 + 弹窗点击外部关闭。**
+> - 修改目标：(a) 我此前加的内置风格气泡覆盖了主题这几个固定定位的悬浮按钮（乐/景/萤/声），导致它们位置错乱；(b) 音乐（乐）与壁纸（景）弹窗只能点关闭按钮，点击其它区域无法关闭。
+> - 修改文件（与上一条气泡记录同一 bundle）：
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js`（新增更高优先级规则，恢复乐/景/萤/声四个悬浮按钮的 `position: fixed`，避免被 `[data-tt]` 气泡锚点规则破坏布局；新增 document 点击外部处理器，点击浮层外时关闭所有 firefly 浮层（音乐卡片/壁纸面板/萤火菜单）；重建 `client.js`：88.1 MB）
+> - 修改内容：气泡现在正确锚定到各控件；乐/景/萤 弹窗支持点击外部关闭（除 Esc 与各自的关闭按钮外）。
+> - 影响范围：firefly 主题客户端 bundle；已同步 fork 源码与运行 profile。
+
+> **本地修改记录（2026-08-21）：移除桌宠功能。**
+> - 修改目标：整体移除桌面宠物插件（不再需要），同时解决一个此前就存在的引用不一致——web-app 引用 `@deepseek-ai/dsh-client-ui-pet`，而包实际名是 `dsh-pet`，导致 `pnpm install` 报错。
+> - 修改文件：
+>   - 删除 `packages/bundle/dsh-pet/*`
+>   - `packages/bundle/web-app/cordis.patch.yml`（移除 `ui-pet` 行）
+>   - `packages/bundle/web-app/package.json`（移除桌宠依赖）
+>   - `tsconfig.client.json`（移除桌宠工程引用）
+>   - `packages/host/apiproxy/src/api-proxy.ts`（从 `WEB_SETTINGS_NAMESPACES` 移除 `ui-pet`）
+>   - `apps/web/src/pet/*`、`apps/web/pet.html`、`apps/web/vite.config.ts` 里的 `pet` Vite 构建入口（移除独立的桌宠窗口页）
+> - 修改内容：桌宠不再进入 web 组合与默认 profile（其插件、设置命名空间、桌宠窗口页均已移除）；`pnpm install` 与构建恢复正常。
+> - 影响范围：Web 客户端组合与默认项 + web 前端桌宠页。
+
+> **本地修改记录（2026-08-21）：重新实现桌面宠物（`ui-pet`）+ 仅在有文件改动时显示“文件已更改”卡片。**
+> - 修改目标：从 `DeepSeek-Harness-GUI` 源码把带「桌宠」开关、随 Agent working/thinking/idle 状态联动的 `ui-pet` 桌宠重新实现回项目；并让每一轮的「N 个文件已更改」回滚卡片只在确实改了文件时出现。
+> - 修改文件：
+>   - 恢复 `packages/client/ui-pet/*`（host `src/index.ts` 注册 `ui-pet` 设置命名空间；client `src/client/index.ts` 通过 BroadcastChannel 把 `session/activity` 转发到桌宠窗口、绑定设置并驱动 `pet_control` 显隐、注册设置里的「桌宠」开关行）
+>   - `packages/bundle/web-app/cordis.patch.yml`（新增 `ui-pet` 行）
+>   - `packages/bundle/web-app/package.json`（新增 `@deepseek-ai/dsh-client-ui-pet` 依赖）
+>   - `tsconfig.client.json`（新增 `ui-pet` 工程引用）
+>   - `packages/host/apiproxy/src/api-proxy.ts`（重新把 `ui-pet` 加入 `WEB_SETTINGS_NAMESPACES`，使设置开关可写）
+>   - `apps/web/pet.html`、`apps/web/src/pet/*`、`apps/web/public/pets/deepseek-fat-fish.webp`、`apps/web/vite.config.ts`（恢复独立桌宠窗口页及其 Vite 入口）
+>   - `packages/client/ui-session-rewind/src/client/RewindCard.tsx`（`filesChanged` 为空时直接返回 null）
+> - 修改内容：桌面宠物（大肥鱼，随 Agent work/think/idle 联动）回归并带「桌宠」开关；「N 个文件已更改」卡片在无文件改动的轮次不再出现。
+> - 影响范围：web 客户端组合 + web 前端桌宠页 + apiproxy 设置白名单。
+
+> **本地修改记录（2026-08-21）：把 `agent-presets` 设置命名空间加入白名单（默认预设选择器）。**
+> - 修改目标：新建会话总是落到「极简模式」，而不是跟随设置在「Agent 预设」里选的默认预设。原因是 `agent-presets` 设置命名空间不在 web 设置客户端白名单里，浏览器设置页无法持久化所选默认值。
+> - 修改文件：`packages/host/apiproxy/src/api-proxy.ts`（把 `agent-presets` 加入 `WEB_SETTINGS_NAMESPACES`）。
+> - 修改内容：默认 Agent 预设现在可在 web 设置页写入，新建会话会使用所选默认预设。
+> - 影响范围：host apiproxy 设置白名单。
+
 ## 开发者预览
 
 DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**

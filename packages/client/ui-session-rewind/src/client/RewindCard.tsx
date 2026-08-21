@@ -169,7 +169,10 @@ export function RewindCard({
     }
   }, [busy, execute, t, userSeq])
 
-  if (status !== 'ready' || checkpoint === undefined) return null
+  // Only render when the turn actually changed files: a checkpoint exists only
+  // for file-editing turns, and an empty filesChanged list would show a useless
+  // "0 个文件已更改" card.
+  if (status !== 'ready' || checkpoint === undefined || checkpoint.code.filesChanged.length === 0) return null
 
   const restoreAvailable = checkpoint.restoreAvailable !== false
   const unverifiedChangeSources = checkpoint.unverifiedChangeSources ?? []

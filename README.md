@@ -6,6 +6,121 @@ DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek 
 
 It uses an architecture where **everything is a plugin**, and is powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper).
 
+> **Local change record (2026-08-21): removed the custom theme and restored the official default theme.**
+> - Goal: remove the bespoke visual theme added to the Web client ("Abyssal Maid Atelier" skin and the "Angelina" theme) and restore the official DeepSeek Harness default theme.
+> - Files changed:
+>   - `packages/bundle/web-app/cordis.patch.yml` — removed the `ui-angelina` and `ui-skin-maid-atelier` rows.
+>   - `packages/bundle/web-app/package.json` — removed the two theme dependencies.
+>   - `tsconfig.client.json` — removed the two project references.
+>   - `packages/client/ui-theme/src/client/index.ts` — removed the "安洁莉娜亮色/暗色" options from the Appearance settings.
+>   - Deleted the `packages/client/ui-angelina` and `packages/client/ui-skin-maid-atelier` package directories.
+> - Effect: the Web client theme registry and Appearance settings no longer register the Angelina theme or the maid-atelier skin; the default light/dark official theme is active.
+> - Scope: affects only the Web client (`dsh web`) appearance/theme settings; default behavior returns to the official state.
+> - Note: run `pnpm install` to clear the dangling `node_modules` symlinks pointing at the removed packages, then rebuild the frontend bundle for the change to take effect.
+
+> **Local change record (2026-08-21): transplanted a standalone plugin marketplace.**
+> - Goal: port the `dsh-market` project (`dshmarket`) into this checkout as a standalone "设置 → 插件市场" (Settings → Plugin Market), replacing the old minimal Settings → Plugins "Marketplace" npm-search tab.
+> - Files changed:
+>   - Added `packages/bundle/dsh-market/*` — the `dshmarket` package (host half + client half + `cordis.patch.yml`), adapted to the workspace build (`package.json`, `tsconfig.json`, `tsdown.config.ts`, `src/invariant.ts`; external test suite dropped).
+>   - `packages/bundle/web-app/cordis.patch.yml` — replaced the `ui-plugin-marketplace` row with the `dsh-market` row (`dshmarket`).
+>   - `packages/bundle/web-app/package.json` — replaced the `@deepseek-ai/dsh-client-ui-plugin-marketplace` dependency with `dshmarket`.
+>   - `tsconfig.client.json` — replaced the `ui-plugin-marketplace` project reference with `packages/bundle/dsh-market`.
+>   - Deleted `packages/client/ui-plugin-marketplace/*`.
+> - Effect: the Web client now shows the standalone dshmarket under Settings → 插件市场 (browse/search/install themes and plugins, backup/restore, updates, diagnostics, hot-disable/enable); the old minimal marketplace tab is gone.
+> - Scope: Web client only. Version caveat — `dshmarket` targets `dsh web` rc.6/rc.7 while this checkout is ~rc.5, so some rc.7-only market self-management/card features may disable themselves rather than render.
+> - Note: run `pnpm install` and `pnpm run build` (or `pnpm --filter dshmarket run bundle` plus a web-frontend rebuild) so the market bundle and composition take effect.
+
+> **Local change record (2026-08-21): baked in the default Firefly theme plugin.**
+> - Goal: ship `dsh-theme-firefly` as a default bundled theme plugin so a fresh `web` profile enables it and the plugin market reports it as installed.
+> - Files changed:
+>   - Added `packages/bundle/dsh-theme-firefly/*` — the prebuilt `dsh-theme-firefly` bundle (client theme + `cordis.patch.yml`; no source, `lib/` shipped as-is; `tsdown.config.ts` returns an empty `entry` so the workspace build skips it).
+>   - `packages/boot/app-boot/src/profile.ts` — `PROFILE_TEMPLATES.web` now bundles `dsh-theme-firefly`; new `PROFILE_TEMPLATE_DEPENDENCIES` seeds it into the profile manifest `dependencies`; `initProfile` gained an optional `defaultDependencies` parameter.
+>   - `packages/boot/app-boot/src/index.ts` — exports `PROFILE_TEMPLATE_DEPENDENCIES`.
+>   - `apps/cli/src/plugin.ts` — passes `PROFILE_TEMPLATE_DEPENDENCIES[profile]` to `initProfile`.
+>   - `packages/bundle/web-app/package.json` — added `dsh-theme-firefly` dependency.
+>   - `tsconfig.base.json` — added a `dsh-theme-firefly` source path mapping.
+> - Effect: a freshly initialized `web` profile enables the Firefly theme and lists it in `dependencies`, so the plugin market shows it installed.
+> - Scope: default web profile template + profile-init boot path only; existing profiles are not touched.
+> - Note: firefly ships prebuilt (`lib/`, no `src/`); its `tsdown.config.ts` returns an empty `entry` so the workspace build skips it (without that, `pnpm run build` fails because there is no tsc-emitted `lib/types/*` entry). Run `pnpm install` and rebuild (`pnpm run build`) for the change to take effect.
+
+> **Local change record (2026-08-21): added a volume slider to the baked-in Firefly theme's music player.**
+> - Goal: expose a volume slider in the firefly theme's background-music widget and wire it to the audio volume (previously fixed at 0.9).
+> - Files changed:
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js` — rebuilt bundle: the music card now has a volume row (slider + live percentage) bound to `audio.volume`, persisted in `localStorage` as `ff_music_volume` (default 0.9).
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js` — template source updated (slider CSS, card volume row, volume wiring) and re-embedded.
+> - Effect: with the firefly theme active, the music card shows a volume slider and a live percentage; the chosen level is remembered across reloads.
+> - Scope: theme client bundle only.
+> - Note: the bundle was rebuilt in the source theme repo via `node build.cjs` (the `assets/`, `music/`, `GIF/` sources live there), so the fork ships the prebuilt `lib/`.
+
+> **Local change record (2026-08-21): added `dspk.png` as a fourth static wallpaper in the Firefly theme.**
+> - Goal: add `apps/desktop/src-tauri/icons/img/dspk.png` to the firefly theme's wallpaper resources (previously 3 static images).
+> - Files changed:
+>   - `packages/bundle/dsh-theme-firefly/assets/dspk.png` — the image copied into the theme asset set.
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js` — rebuilt bundle (dspk.png embedded as a 4th static wallpaper; the earlier volume slider is preserved).
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js` — template source re-embedded.
+> - Effect: the firefly theme now offers 4 static wallpapers (firefly-bg.jpg, firefly2.png, firefly3.png, dspk.png) plus the default video.
+> - Scope: theme client bundle + assets only.
+> - Note: the rebuild happened in the source theme repo (`node build.cjs`); the bundle grew from ~70 MB to ~88 MB because the ~14 MB image is embedded as base64.
+
+> **Local change record (2026-08-21): baked in the `dsh-modef` plugin (model picker + reasoning-effort slider).**
+> - Goal: ship `@magiczerowxy/dsh-modef` (a model dropdown + Claude-style reasoning-effort slider with max-tier animations) as a default web-profile plugin so it is enabled and shown as installed in the plugin market, and its General-settings switch is exposed.
+> - Files changed:
+>   - Added `packages/bundle/dsh-modef/*` — the prebuilt `@magiczerowxy/dsh-modef` bundle (host `lib/index.js` + client `lib/client.js` + `cordis.patch.yml`; the host half's hardcoded debug-log write was removed; `tsdown.config.ts` returns an empty `entry` so the workspace build skips it).
+>   - `packages/boot/app-boot/src/profile.ts` — `PROFILE_TEMPLATES.web` now bundles `@magiczerowxy/dsh-modef`; `PROFILE_TEMPLATE_DEPENDENCIES.web` seeds it (`^0.1.0`).
+>   - `packages/host/apiproxy/src/api-proxy.ts` — added `dsh-modef` to `WEB_SETTINGS_NAMESPACES` (the Web settings-card whitelist) so the General-settings switch is editable (the official decision point the plugin's README calls out).
+>   - `packages/bundle/web-app/package.json` — added `@magiczerowxy/dsh-modef` dependency.
+>   - `tsconfig.base.json` — added a `@magiczerowxy/dsh-modef` source path mapping.
+> - Effect: a fresh `web` profile enables the model/effort selector and lists `@magiczerowxy/dsh-modef` in `dependencies`, so the plugin market shows it installed; the "高级的推理强度选择" switch is ON by default (`advancedEffort` defaults to `true`), so the slider shows without manual toggling. The settings schema default lives in the prebuilt host half (`packages/bundle/dsh-modef/lib/index.js`), which ships as-is (tsdown skips it).
+> - Scope: default web profile template + profile-init boot path + apiproxy settings whitelist; existing profiles are untouched (they would still need the plugin installed, or the profile reseeded).
+> - Note: dsh-modef ships prebuilt (`lib/`, no `src/`); its `tsdown.config.ts` skips the workspace build. The apiproxy whitelist change is in source (`src/api-proxy.ts`) and is recompiled by `pnpm run build`.
+
+> **Local change record (2026-08-21): replaced the Firefly theme's native tooltips with built-in-style UI tooltips.**
+> - Goal: the firefly theme's controls (music player, wallpaper, ambience, typing-sound, etc.) showed OS/native `title` tooltips; switch them to the built-in UI tooltip look (dark plate, light text, rounded, fade-in) so the whole app is consistent.
+> - Files changed:
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js` — removed all native `title=`/`.title` tooltips; controls now carry `data-tt` (styled tooltip) + `aria-label` (accessibility); added a `[data-tt]::after` tooltip CSS matching the dsh `Tooltip` visual spec.
+>   - `packages/bundle/dsh-theme-firefly/lib/client.js` — rebuilt bundle (88.1 MB); same changes embedded.
+> - Effect: hovering/focusing any firefly theme control now shows the built-in-style tooltip bubble instead of the system tooltip.
+> - Scope: firefly theme client bundle only (dsh-market/dsh-modef already use the built-in React `Tooltip`).
+> - Note: rebuilt in the source theme repo via `node build.cjs`; the build.sizes stay ~88 MB (no asset change).
+
+> **Local change record (2026-08-21): fixed the Firefly tooltip position and added click-outside-to-close.**
+> - Goal: (a) the built-in-style tooltips I added earlier were overriding the theme's fixed-position toggle buttons (`乐/景/萤/声`), putting them in the wrong place; (b) the music (`乐`) and wallpaper (`景`) panels only closed via their close button — clicking elsewhere didn't dismiss them.
+> - Files changed (same bundle as the tooltip record):
+>   - `packages/bundle/dsh-theme-firefly/lib/client.template.js` — added a higher-specificity rule restoring `position: fixed` on the four firefly toggles (so the `[data-tt]` tooltip anchor rule no longer breaks their layout); added a document click-outside handler that closes all firefly floating panels (music card, wallpaper panel, ambience menu) when clicking outside them; `client.js` rebuilt (88.1 MB).
+> - Effect: tooltips appear anchored to each control correctly; `乐`/`景`/`萤` popovers now dismiss on outside click (in addition to Esc and their close buttons).
+> - Scope: firefly theme client bundle; synced to the fork source and the running profile.
+
+> **Local change record (2026-08-21): removed the desktop pet feature.**
+> - Goal: drop the desktop pet plugin entirely (no longer wanted), which also resolves a pre-existing workspace reference mismatch that broke `pnpm install` (web-app referenced `@deepseek-ai/dsh-client-ui-pet` while the package is named `dsh-pet`).
+> - Files changed:
+>   - Deleted `packages/bundle/dsh-pet/*`.
+>   - `packages/bundle/web-app/cordis.patch.yml` — removed the `ui-pet` row.
+>   - `packages/bundle/web-app/package.json` — removed the pet dependency.
+>   - `tsconfig.client.json` — removed the pet project reference.
+>   - `packages/host/apiproxy/src/api-proxy.ts` — removed `ui-pet` from `WEB_SETTINGS_NAMESPACES`.
+>   - `apps/web/src/pet/*`, `apps/web/pet.html`, and the `pet` Vite build entry (`apps/web/vite.config.ts`) — removed the standalone desktop pet-window page.
+> - Effect: the desktop pet no longer ships in the web composition / default profile (its plugin, its settings namespace, and its pet-window page are all gone); `pnpm install` and the build resolve cleanly.
+> - Scope: web client composition + defaults + the web frontend pet page.
+
+> **Local change record (2026-08-21): re-implemented the desktop pet (`ui-pet`) and gated the "files changed" card.**
+> - Goal: bring back the `ui-pet` desktop pet (with the "桌宠" settings toggle + agent working/thinking/idle state animations) from the `DeepSeek-Harness-GUI` source; also make the per-turn "N 个文件已更改" rewind card appear only when a turn actually changed files.
+> - Files changed:
+>   - Restored `packages/client/ui-pet/*` (host `src/index.ts` registers the `ui-pet` settings namespace; client `src/client/index.ts` forwards `session/activity` to the pet window over BroadcastChannel, binds the settings scope and drives `pet_control` to show/hide the window, and registers the General-section "桌宠" toggle row).
+>   - `packages/bundle/web-app/cordis.patch.yml` — added the `ui-pet` row.
+>   - `packages/bundle/web-app/package.json` — added the `@deepseek-ai/dsh-client-ui-pet` dependency.
+>   - `tsconfig.client.json` — added the `ui-pet` project reference.
+>   - `packages/host/apiproxy/src/api-proxy.ts` — re-added `ui-pet` to `WEB_SETTINGS_NAMESPACES` (so the settings switch is writable).
+>   - `apps/web/pet.html`, `apps/web/src/pet/*`, `apps/web/public/pets/deepseek-fat-fish.webp`, and the `pet` Vite build entry (`apps/web/vite.config.ts`) — restored the standalone pet-window page.
+>   - `packages/client/ui-session-rewind/src/client/RewindCard.tsx` — early-return also when `checkpoint.code.filesChanged.length === 0`.
+> - Effect: the desktop pet (deepseek fat-fish, agent working/thinking/idle) is back with its "桌宠" switch; the "N 个文件已更改" card no longer appears for turns with no file changes.
+> - Scope: web client composition, web frontend pet page, and apiproxy settings whitelist.
+
+> **Local change record (2026-08-21): whitelisted the agent-presets settings namespace (default preset picker).**
+> - Goal: new sessions were defaulting to "极简模式" instead of following the default agent preset chosen in Settings → Agent Preset. The `agent-presets` settings namespace was not in the web settings client whitelist, so the browser settings UI could not persist the chosen default.
+> - Files changed: `packages/host/apiproxy/src/api-proxy.ts` — added `agent-presets` to `WEB_SETTINGS_NAMESPACES`.
+> - Effect: the default-agent-preset setting is now writable from the web settings UI, so a new session uses the chosen default preset.
+> - Scope: host apiproxy settings whitelist.
+
 ## Developer preview
 
 DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
